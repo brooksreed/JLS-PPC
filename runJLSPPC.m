@@ -17,21 +17,23 @@ clc
 
 % schedule
 tm = 1; % meas delay
-tc = 0; % control delay
-ta = 0; % ACK delay
+tc = 3; % control delay
+ta = 1; % ACK delay
 
 % 'SISO_' options for _piggyback or _noACK:
+% (NOTE - if piggyback, ta should equal tm)
 % 'SISO2' - [1 0], [0 1] for pi, xi
 % 'SISO4' - [1 0 0 0], [0 0 1 0] for pi, xi 
 
 %sched = 'SISO4_piggyback';
 %sched = 'SISO4_noACK';
-sched = 'SISO2_noACK';
+%sched = 'SISO2_noACK';
+sched = 'SISO2_piggyback';
 
 % packet success probabilities
-alphaBar = 1; % controls
-betaBar = 1;  % measurements
-gammaBar = 1; % ACKs
+alphaBar = .8; % controls
+betaBar = .8;  % measurements
+gammaBar = .8; % ACKs
 
 %%%%
 
@@ -121,3 +123,5 @@ stairs(0:Ns-1,r.u,'k')
 hold on
 stairs(0:Ns-1,r.w,'b:')
 legend('u','w')
+
+% add plotting of packet loss?  work out timing... 

@@ -50,8 +50,8 @@ u = zeros(NU,Ns);
 U = zeros(Nu*Np*Nv,Ns);
 
 % initialize Dhat and Dyes
-Dh = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns);   % D hat for estimator
-Ds = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns);   % used to track utilde for cov. prior
+Dh = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns+tc);   % D hat for estimator
+Ds = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns+tc);   % used to track utilde for cov. prior
 alphat = repmat(alphaBar,[1 Ns]);
 for t = (tc+1):Ns
     Dh(:,:,t) = makeD(Pi(:,t-tc),alphat(:,t-tc),Nu,Np);
