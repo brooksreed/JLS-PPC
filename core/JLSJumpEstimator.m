@@ -9,13 +9,6 @@ function [Dh,alphat,a,KFstart] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,...
 
 % BR, 9/30/2014 (modified into separate function)
 
-%%%%
-% mods for ACK history
-% input nACKHistory
-% pass in/out tNoACK = Nv x 1 vector
-% 
-
-
 % determine ACKs available at this step
 % at step t, ACKs are sent at t-ta
 a(:,:,t-ta) = diag(Lambda(:,t-ta).*gamma(:,t-ta));

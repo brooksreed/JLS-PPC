@@ -8,15 +8,30 @@ function [pi,xi,lambda,tap,Ts] = createSchedule(sched,Nv,Ns,tc)
 % 'MX_piggyback', 'IL_piggyback' -- ACK sched matches measurements
 % 'MX_ACK1', 'IL_ACK1' -- ACK 1 slot after control (assumes tc=1)
 %
+% 'SISO_' options for _piggyback or _noACK:
+% 'SISO2' - [1 0], [0 1] for pi, xi
+% 'SISO4' - [1 0 0 0], [0 0 1 0] for pi, xi
+%
 % tap = Nv x 1 vector of time between planned control RX and ACK TX
-
-
 
 % BR, 4/23/2014
 
 % update 6/17/2014 for ACKs
+% kind of sloppy right now, lots of hardcoding...  make more modular?
 
-if(strfind(sched,'longSISO'))
+if(strfind(sched,'SISO2'))
+    Ts = 2;
+    piBase = [1 0];
+    xiBase = [0 1];
+    if(strfind(sched,'piggyback'))
+        lambdaBase = xiBase;
+    elseif(strfind(sched,'noACK'))
+        lambdaBase = [0 0];
+    end
+end
+
+
+if(strfind(sched,'SISO4'))
     Ts = 4;
     piBase = [1 0 0 0];
     xiBase = [0 0 1 0];

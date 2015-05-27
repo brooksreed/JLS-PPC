@@ -85,6 +85,7 @@ y(:,2) = C*X(1:Nx,1) + v(:,2);
 u(:,1) = E1*X(Nx+1:end,1);
 
 % Loop starts at "estimator" at time t=2, when first meas (t=1) is RX'd
+% this assumes that tm=1...  (need to change for tm=0)
 % (future: generalize for tm>1: make init such that loop starts at tm+1)
 for t = 2:(Ns-1)
     looptic = tic;
