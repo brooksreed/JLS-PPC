@@ -271,6 +271,8 @@ results.XPlan = XPlan;
 results.MPCtime = MPCtime;
 results.looptime = looptime;
 results.MPCFail = MPCFail;
+results.rmsEstError = nanrms(X(1:Nv,:) - Xh(1:Nv,:),2);
+results.rmsPosError = nanrms(X(1,:),2);
 
 end
 

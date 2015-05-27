@@ -87,7 +87,37 @@ if(strfind(sched,'piggyback'))
 end
 Np = NpMult*Ts;
 
-[results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tap,...
+[r] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tap,...
     alphaBar,Pi,Xi,Lambda,umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,...
     w,v,alpha,beta,gamma);
 
+% convenient if want to save:
+r.P1 = P1;
+r.v = v;
+r.w = w;
+r.xIC = xIC;
+r.xHat1 = xHat1;
+r.alpha = alpha;
+r.beta = beta;
+r.gamma = gamma;
+    
+    
+%% plots (for SISO systems)
+
+% (could be used with a saved r struct too)
+NxSys = size(r.P,1);    % underlying system states (no buffer)
+Ns = size(r.X,2);
+
+figure
+subplot(3,1,[1 2])
+plot(0:Ns-1,C*r.X(1:NxSys,:))
+hold on
+plot(0:Ns-1,C*r.Xh(1:NxSys,:),'g.:')
+legend('X','XHat')
+title(sprintf('integrator sys, alphaBar = %0.2f, W=%.1f, V=%.1f',alphaBar,W,V))
+
+subplot(3,1,3)
+stairs(0:Ns-1,r.u,'k')
+hold on
+stairs(0:Ns-1,r.w,'b:')
+legend('u','w')
