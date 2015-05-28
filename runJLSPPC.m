@@ -6,6 +6,13 @@
 
 % calls simJLSPPC (which calls functions in core)
 
+%{
+5/28
+- tested with tm=0,1,2
+- tested with tc=0,1,2 (checked XhMPC vs. Xh)
+ 
+%}
+
 
 clear variables
 close all
@@ -17,7 +24,7 @@ clc
 
 % schedule
 tm = 1; % meas delay
-tc = 3; % control delay
+tc = 1; % control delay
 ta = 1; % ACK delay
 
 % 'SISO_' options for _piggyback or _noACK:
@@ -37,15 +44,17 @@ gammaBar = .8; % ACKs
 
 %%%%
 
-Ns=100; % sim length
-NpMult = 4; % the MPC horizon Np = Ts*NpMult 
-Nv=1;   % # vehicles (comms channels)
+Ns = 50; % sim length
+NpMult = 5; % the MPC horizon Np = Ts*NpMult 
+Nv = 1;   % # vehicles (comms channels)
 
-% SISO Double Integrator
+% Double Integrator
 A =[1,1;0,1];
 Bu = [0.5;1];
 Bw = Bu;
-C = [1 0];
+C = [1 0];      % position output
+%C = eye(2);    % full state output
+
 Q = [10,0;0,1];
 Qf = 10*Q;
 R = 1;
@@ -57,20 +66,26 @@ codebook = linspace(umin,umax,nLevels);
 
 % process/measurement noise
 W = .1;
-V = 4;
+V = .1;%4;
 % W = 1;
 % V = .1;
 
 % estimation init
 xHat1 = zeros(2,1);
-P1 = 30*eye(2);
-
+% cov... uncertain position but better-known velocity (closer to zero)
+P1 = [25,0;0,9];     
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SYSTEM INIT/SETUP
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-xIC = randn(2,1);
+xIC = 5*randn(2,1);
+% position only, no initial velocity (so like step resp from rest)
+xIC(2)=0;xIC(1)=5;
+
+% (IF WANT TO DEBUG CONTROLLER - INIT ESTIMATOR PERFECTLY)
+% xHat1 = xIC;P1 = 1*eye(2);
+
 w = sqrt(W)*randn(1,Ns);
 v = sqrt(V)*randn(1,Ns);
 
@@ -106,22 +121,49 @@ r.gamma = gamma;
     
 %% plots (for SISO systems)
 
+CPlot = [1 0];  % output for plotting
+plotXhMPC = 1;  % plots prediction used for computing control
+plotLosses = 1; % plots packet losses for c, m (no a right now)
+
 % (could be used with a saved r struct too)
 NxSys = size(r.P,1);    % underlying system states (no buffer)
 Ns = size(r.X,2);
 
 figure
+
 subplot(3,1,[1 2])
-plot(0:Ns-1,C*r.X(1:NxSys,:))
+hx = plot(0:Ns-1,CPlot*r.X(1:NxSys,:));
 hold on
-plot(0:Ns-1,C*r.Xh(1:NxSys,:),'g.:')
-legend('X','XHat')
+hxh = plot(0:Ns-1,CPlot*r.Xh(1:NxSys,:),'g.:');
 title(sprintf('integrator sys, alphaBar = %0.2f, W=%.1f, V=%.1f',alphaBar,W,V))
+
+hb=[];hc=[];
+if(plotLosses)
+    for k = 1:Ns
+        if(r.alpha(k)==0)
+            hc = plot([k-1+tc k-1+tc], [-0.25 0],'r');
+        end
+        if(r.beta(k)==0)
+            hb = plot([k-1 k-1],[-.75 -.5],'m');
+        end
+%         if(r.gamma(k)==0)
+%             % need to save/load tap, do on per-veh. basis
+%             ha = plot([k-1-tc-tap k-1-tc-tap],[-.75 -.5],'c');
+%         end
+    end
+end
+
+if(plotXhMPC)
+    hxhm = plot(0:Ns-1,CPlot*squeeze(r.XhMPC(1:NxSys,end,1:Ns)),'ko');
+    legend([hx hxh hxhm hc hb],'X','XHat','XHatMPC','c loss','m loss')
+else
+    legend([hx hxh hc hb],'X','XHat','c loss','m loss')
+end
+
 
 subplot(3,1,3)
 stairs(0:Ns-1,r.u,'k')
 hold on
 stairs(0:Ns-1,r.w,'b:')
 legend('u','w')
-
-% add plotting of packet loss?  work out timing... 
+xlabel('time step')

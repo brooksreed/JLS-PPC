@@ -9,7 +9,6 @@ function [results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tap,...
 % BR, 4/23/2014
 % modifying for delayed ACKs, 6/13/2014
 
-nonlinearSlice = 0;
 
 printouts = 0;
 
@@ -84,10 +83,8 @@ X(1:Nx,2) =  A*xIC + w(:,1);
 y(:,2) = C*X(1:Nx,1) + v(:,2);
 u(:,1) = E1*X(Nx+1:end,1);
 
-% Loop starts at "estimator" at time t=2, when first meas (t=1) is RX'd
-% this assumes that tm=1...  (need to change for tm=0)
-% (future: generalize for tm>1: make init such that loop starts at tm+1)
-for t = 2:(Ns-1)
+% Loop starts at "estimator" at time t=tm+1, when first meas (t=1) is RX'd
+for t = (tm+1):(Ns-1)
     looptic = tic;
     
     % determine which measurements are available at estimator at this step
@@ -151,6 +148,7 @@ for t = 2:(Ns-1)
         % starts with Xh: xHat_{t-tm|t-tm}, bHat_{t-tm-1}
         % compute xHatMPC_{t-tm+1:t+tc|t-tm}, bHatMPC_{t-tm:t+tc-1}
         % first step: uses uHat_{t-tm} <-- Dh(:,:,t-tm)
+        % *NOTE* Goal of XhMPC(:,end,:) is to match true X(:,:) 
         
         Ufwd = U(:,(t-tm):(t+tc-1));
         Dfwd = Dh(:,:,(t-tm):(t+tc-1));
@@ -229,11 +227,7 @@ for t = 2:(Ns-1)
     u(:,t) = E1*X(Nx+1:end,t+1);
     
     % measurement z_{t+1}:
-    if(nonlinearSlice)
-        y(:,t+1) = nonlinearSliceMeas(C,X(1:Nx,t+1))+v(:,t+1);
-    else
-        y(:,t+1) = C*X(1:Nx,t+1) + v(:,t+1);
-    end
+    y(:,t+1) = C*X(1:Nx,t+1) + v(:,t+1);
     
     looptime(t) = toc(looptic);
     
