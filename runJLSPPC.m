@@ -13,7 +13,7 @@ clc
 
 % fix issue with pi, ack history, remove the hardcode pi = ones
 
-nACKHistory = 1;
+nACKHistory = 10;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SYSTEM DEFINITION
@@ -88,8 +88,14 @@ end
 
 [Pi,Xi,Lambda,tap,Ts] = createSchedule(sched,Nv,Ns,tc);
 
+
+
+%%%%%%%%%%%%%%%
 % TESTING EARLY ACK HISTORY - OVERWRITE PI
 Pi = ones(size(Pi));
+%%%%%%%%%%%%%%%%%
+
+
 
 if(strfind(sched,'piggyback'))
     % ACK piggybacked to measurement

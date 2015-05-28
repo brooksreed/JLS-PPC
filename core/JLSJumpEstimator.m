@@ -17,6 +17,8 @@ function [Dh,alphat,a,KFstart,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,..
 %(think about how this might change with exp version, where don't have
 %access to full history of acks in the sim)
 
+
+% INCREMENT BASED ON PI? (AND t-ta-tap)?
 tNoACK  = tNoACK+1; % always increment 1 step at beginning
 
 % limit "lookback" to the length of the ACK history sent
@@ -46,7 +48,7 @@ if(~isempty(ackInds))
         ii = ackInds(i);
         % note... ackTimes indexed same as ackInds
         % tNoACK indexed over 1,...,Nv (so use ii)
-        for tprime = ackTimes(i)-tNoACK(ii):ackTimes(i)
+        for tprime = (ackTimes(i)-tNoACK(ii)):ackTimes(i)
             alphat(ii,tprime-tc) = alpha(ii,...
                 tprime-tc);
         end
