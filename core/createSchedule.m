@@ -9,6 +9,7 @@ function [pi,xi,lambda,tap,Ts] = createSchedule(sched,Nv,Ns,tc)
 % 'MX_ACK1', 'IL_ACK1' -- ACK 1 slot after control (assumes tc=1)
 %
 % 'SISO_' options for _piggyback or _noACK:
+% 'SISOALL' - [1],[1] (std. discrete-time)
 % 'SISO2' - [1 0], [0 1] for pi, xi
 % 'SISO4' - [1 0 0 0], [0 0 1 0] for pi, xi
 %
@@ -18,6 +19,17 @@ function [pi,xi,lambda,tap,Ts] = createSchedule(sched,Nv,Ns,tc)
 
 % update 6/17/2014 for ACKs
 % kind of sloppy right now, lots of hardcoding...  make more modular?
+
+if(strfind(sched,'SISOALL'))
+    Ts = 1;
+    piBase = 1;
+    xiBase = 1;
+    if(strfind(sched,'piggyback'))
+        lambdaBase = xiBase;
+    elseif(strfind(sched,'noACK'))
+        lambdaBase = 0;
+    end
+end
 
 if(strfind(sched,'SISO2'))
     Ts = 2;

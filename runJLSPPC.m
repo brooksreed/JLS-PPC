@@ -1,18 +1,12 @@
 % Script to run a simple simulation of JLS-PPC
 % BR, 5/27/2015
 
-% SISO double integrator system
+% double integrator system
 % a few options for schedules
+% handles varying lengths of ACK histories
 
 % calls simJLSPPC (which calls functions in core)
-
-%{
-5/28
-- tested with tm=0,1,2
-- tested with tc=0,1,2 (checked XhMPC vs. Xh)
- 
-%}
-
+% some simple plots for SISO systems at end
 
 clear variables
 close all
@@ -23,12 +17,10 @@ clc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % schedule
-tm = 1; % meas delay
-tc = 1; % control delay
-ta = 1; % ACK delay
 
 % 'SISO_' options for _piggyback or _noACK:
 % (NOTE - if piggyback, ta should equal tm)
+% 'SISOALL' - [1],[1] - std. discrete time
 % 'SISO2' - [1 0], [0 1] for pi, xi
 % 'SISO4' - [1 0 0 0], [0 0 1 0] for pi, xi 
 
@@ -36,15 +28,30 @@ ta = 1; % ACK delay
 %sched = 'SISO4_noACK';
 %sched = 'SISO2_noACK';
 sched = 'SISO2_piggyback';
+%sched = 'SISOALL_piggyback';
+
+% # ACK Histories sent (makes most sense to be multiple of schedule length)
+% For 'SINGLE ACK': set nACKHistory = Ts (schedule length)
+nACKHistory = 6;
+
+% NOTE:
+% With very long ACK history, a posteriori estimate should have no effects
+% of control packet losses.  Control is still affected due to XhMPC 
+% lacking information in the real-time loop
+
+% delays
+tm = 1; % meas delay
+tc = 1; % control delay
+ta = 1; % ACK delay
 
 % packet success probabilities
 alphaBar = .8; % controls
 betaBar = .8;  % measurements
-gammaBar = .8; % ACKs
+gammaBar = .8; % ACKs (if piggyback used, betaBar overrides gammaBar)
 
-%%%%
+%%%%%%%%%%%%%%%%%%
 
-Ns = 50; % sim length
+Ns = 100; % sim length
 NpMult = 5; % the MPC horizon Np = Ts*NpMult 
 Nv = 1;   % # vehicles (comms channels)
 
@@ -98,6 +105,7 @@ for k = 1:Ns
 end
 
 [Pi,Xi,Lambda,tap,Ts] = createSchedule(sched,Nv,Ns,tc);
+
 if(strfind(sched,'piggyback'))
     % ACK piggybacked to measurement
     gamma = beta;   % overwrite
@@ -106,7 +114,7 @@ Np = NpMult*Ts;
 
 [r] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tap,...
     alphaBar,Pi,Xi,Lambda,umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,...
-    w,v,alpha,beta,gamma);
+    w,v,alpha,beta,gamma,nACKHistory);
 
 % convenient if want to save:
 r.P1 = P1;
@@ -117,8 +125,13 @@ r.xHat1 = xHat1;
 r.alpha = alpha;
 r.beta = beta;
 r.gamma = gamma;
+% (could reconstruct from sched but simpler to just save)
+r.Pi = Pi;
+r.Xi = Xi;
+r.Lambda = Lambda;
     
-    
+% (save r struct here if want)
+
 %% plots (for SISO systems)
 
 CPlot = [1 0];  % output for plotting
@@ -140,13 +153,15 @@ title(sprintf('integrator sys, alphaBar = %0.2f, W=%.1f, V=%.1f',alphaBar,W,V))
 hb=[];hc=[];
 if(plotLosses)
     for k = 1:Ns
-        if(r.alpha(k)==0)
-            hc = plot([k-1+tc k-1+tc], [-0.25 0],'r');
+        if( (r.Pi(k) - r.alpha(k)*r.Pi(k)) == 1 )
+            %hc = plot([k-1+tc k-1+tc], [-0.25 0],'r');
+            hc = plot(k-1+tc,0,'ro');
         end
-        if(r.beta(k)==0)
-            hb = plot([k-1 k-1],[-.75 -.5],'m');
+        if( (r.Xi(k) - r.beta(k)*r.Xi(k)) ==1 )
+            %hb = plot([k-1 k-1],[-.75 -.5],'m');
+            hb = plot(k-1,-2,'mo');
         end
-%         if(r.gamma(k)==0)
+%         if( (r.Lambda(k) - r.gamma(k)*r.Lambda(k)) ==1 )
 %             % need to save/load tap, do on per-veh. basis
 %             ha = plot([k-1-tc-tap k-1-tc-tap],[-.75 -.5],'c');
 %         end
@@ -154,7 +169,7 @@ if(plotLosses)
 end
 
 if(plotXhMPC)
-    hxhm = plot(0:Ns-1,CPlot*squeeze(r.XhMPC(1:NxSys,end,1:Ns)),'ko');
+    hxhm = plot(0:Ns-1,CPlot*squeeze(r.XhMPC(1:NxSys,end,1:Ns)),'k.');
     legend([hx hxh hxhm hc hb],'X','XHat','XHatMPC','c loss','m loss')
 else
     legend([hx hxh hc hb],'X','XHat','c loss','m loss')
