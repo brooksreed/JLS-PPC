@@ -19,10 +19,10 @@ clear variables
 close all
 clc
 
-
-% fix issue with pi, ack history, remove the hardcode pi = ones
-
-nACKHistory = 10;
+% (with very long ACK history, a posteriori estimate should have no effects
+% of control packet losses.  control still affected due to XhMPC lacking
+% information in real-time loop)
+nACKHistory = 100;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SYSTEM DEFINITION
@@ -35,18 +35,20 @@ ta = 1; % ACK delay
 
 % 'SISO_' options for _piggyback or _noACK:
 % (NOTE - if piggyback, ta should equal tm)
+% 'SISOALL' - [1],[1] - std. discrete time
 % 'SISO2' - [1 0], [0 1] for pi, xi
 % 'SISO4' - [1 0 0 0], [0 0 1 0] for pi, xi 
 
 %sched = 'SISO4_piggyback';
 %sched = 'SISO4_noACK';
 %sched = 'SISO2_noACK';
-sched = 'SISO2_piggyback';
+%sched = 'SISO2_piggyback';
+sched = 'SISOALL_piggyback';
 
 % packet success probabilities
-alphaBar = 1; % controls
+alphaBar = .2; % controls
 betaBar = 1;  % measurements
-gammaBar = 1; % ACKs
+gammaBar = .8; % ACKs
 
 %%%%
 
@@ -104,15 +106,6 @@ for k = 1:Ns
 end
 
 [Pi,Xi,Lambda,tap,Ts] = createSchedule(sched,Nv,Ns,tc);
-
-
-
-%%%%%%%%%%%%%%%
-% TESTING EARLY ACK HISTORY - OVERWRITE PI
-Pi = ones(size(Pi));
-%%%%%%%%%%%%%%%%%
-
-
 
 if(strfind(sched,'piggyback'))
     % ACK piggybacked to measurement

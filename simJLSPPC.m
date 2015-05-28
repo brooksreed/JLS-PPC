@@ -9,10 +9,6 @@ function [results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tap,...
 % BR, 4/23/2014
 % modifying for delayed ACKs, 6/13/2014
 
-
-% pass in/out the tNoACK
-% anything else needed?? 
-
 printouts = 0;
 
 % currently always uses alphaBar state prior adjustment
