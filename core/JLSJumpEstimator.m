@@ -1,5 +1,5 @@
-function [Dh,alphat,a,KFstart] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,...
-    Lambda,gamma,t,tm,tc,ta,tap,Nu,Np)
+function [Dh,alphat,a,KFstart,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,...
+    Lambda,gamma,t,tm,tc,ta,tap,Nu,Np,tNoACK,nACKHistory)
 % Jump estimator and prep for (lossy,delayed) KF
 % [Dh,alphat,a,KFstart] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,...
 %    Lambda,gamma,t,tm,tc,ta,tap,Nu,Np)
@@ -7,8 +7,26 @@ function [Dh,alphat,a,KFstart] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,...
 % (If no ACK, Dh is left as input -- currently uses alphaBar)
 % Determines time that ACK'd buffer starts, outputs KFstart
 
-% BR, 9/30/2014 (modified into separate function)
+% BR, 5/27/2015 (modified from single ACK version)
 
+%% future -- with ACK histories
+
+% need to fix tNoACK counter...  something about mod with pi schedule...
+% maybe problem is just with the warning...?
+
+%(think about how this might change with exp version, where don't have
+%access to full history of acks in the sim)
+
+tNoACK  = tNoACK+1; % always increment 1 step at beginning
+
+% limit "lookback" to the length of the ACK history sent
+for i = 1:length(tNoACK)
+    if(tNoACK(i) > nACKHistory)
+        tNoACK(i) = nACKHistory;
+        disp('WARNING: number of dropped ACKs exceeds ACK history')
+    end
+end
+    
 % determine ACKs available at this step
 % at step t, ACKs are sent at t-ta
 a(:,:,t-ta) = diag(Lambda(:,t-ta).*gamma(:,t-ta));
@@ -18,45 +36,6 @@ okInds = logical((aTimes-tc)>1);
 ackInds = aInds(okInds);
 ackTimes = aTimes(okInds);
 
-if(~isempty(ackInds))
-    % times where ACK will update Dh
-    % ACK RD'd: go back and update DHat for ackInds at ackTimes
-    % (Dh init to pi.*alphaBar -- only update times where ACK changes)
-    for i = 1:length(ackInds)
-        ii = ackInds(i);
-        alphat(ii,ackTimes(i)-tc) = alpha(ii,...
-            ackTimes(i)-tc);
-    end
-    for i = 1:length(ackInds)
-        k = ackTimes((i));
-        Dh(:,:,k) = makeD(Pi(:,k-tc),alphat(:,k-tc),Nu,Np);
-    end
-end
-
-if(isempty(ackInds))
-    KFstart = t - tm;   % usual 1-step update
-else
-    KFstart = min((t-tm),min(ackTimes));
-end
-
-return
-
-%% future -- with ACK histories
-
-%pass tNoACK in/out, input nACKHistory
-%(think about how this might change with exp version, where don't have
-%access to full history of acks in the sim)
-
-tNoAck  = tNoAck+1; % always increment 1 step at beginning
-
-% limit "lookback" to the length of the ACK history sent
-for i = 1:Nv
-    if(tNoAck(i) > nACKHistory)
-        tNoAck(i) = nACKHistory;
-        disp('WARNING: number of dropped ACKs exceeds ACK history')
-    end
-end
-    
 if(~isempty(ackInds))
     
     % times where ACK will update Dh
@@ -87,10 +66,43 @@ if(isempty(ackInds))
     KFstart = t - tm;   % usual 1-step update
 else
     % if ACKs, KF start goes back to oldest useful (eg new) ACK
-    KFstart = min((t-tm),min(ackTimes-tNoAck(ackInds)));
+    KFstart = min((t-tm),min(ackTimes-tNoACK(ackInds)));
 end
 
 for i = 1:length(ackInds)
     tNoACK(ackInds(i)) = 0; % for ackInds, reset counter to zero    
 end
 
+return
+
+%% original
+
+% determine ACKs available at this step
+% at step t, ACKs are sent at t-ta
+a(:,:,t-ta) = diag(Lambda(:,t-ta).*gamma(:,t-ta));
+aInds = find(diag(a(:,:,t-ta)));
+aTimes = t - ta - tap(aInds);
+okInds = logical((aTimes-tc)>1);
+ackInds = aInds(okInds);
+ackTimes = aTimes(okInds);
+
+if(~isempty(ackInds))
+    % times where ACK will update Dh
+    % ACK RD'd: go back and update DHat for ackInds at ackTimes
+    % (Dh init to pi.*alphaBar -- only update times where ACK changes)
+    for i = 1:length(ackInds)
+        ii = ackInds(i);
+        alphat(ii,ackTimes(i)-tc) = alpha(ii,...
+            ackTimes(i)-tc);
+    end
+    for i = 1:length(ackInds)
+        k = ackTimes((i));
+        Dh(:,:,k) = makeD(Pi(:,k-tc),alphat(:,k-tc),Nu,Np);
+    end
+end
+
+if(isempty(ackInds))
+    KFstart = t - tm;   % usual 1-step update
+else
+    KFstart = min((t-tm),min(ackTimes));
+end
