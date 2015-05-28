@@ -7,15 +7,12 @@
 % calls simJLSPPC (which calls functions in core)
 
 
-
 %{
 5/28
 - tested with tm=0,1,2
 - tested with tc=0,1,2 (checked XhMPC vs. Xh)
  
 %}
-
-
 
 
 clear variables
