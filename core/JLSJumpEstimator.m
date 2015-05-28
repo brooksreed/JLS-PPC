@@ -18,13 +18,20 @@ function [Dh,alphat,a,KFstart,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,..
 % initial approach - clarity over efficiency
 % refactor later?
 
+printDebug = 1;
+
 tNoACK  = tNoACK+1; % always increment 1 step at beginning
+if(printDebug)
+    fprintf('\ntNoACK=%d\n',tNoACK)
+end
 
 % limit "lookback" to the length of the ACK history sent
 for i = 1:length(tNoACK)
     if(tNoACK(i) > nACKHistory)
         tNoACK(i) = nACKHistory;
-        disp('WARNING: number of dropped ACKs exceeds ACK history')
+        if(printDebug)
+            fprintf('\n Step %d WARNING: #dropped ACKs > ACK history\n',t)
+        end
     end
 end
 
@@ -33,15 +40,13 @@ end
 a(:,:,t-ta) = diag(Lambda(:,t-ta).*gamma(:,t-ta));
 aInds = find(diag(a(:,:,t-ta)));
 
-%{
-fprintf('\n ACK Inds now: ')
-disp(aInds)
-fprintf('\n')
-%}
+% check at startup - ack referencing negative time
+if(~isempty(aInds))
+    initTimes = tNoACK(aInds);
+end
 
-% (t-ta): ACK arrive at step 1 (no control to ACK)
-% may have to fix other edge cases where min_tACK<1 ?  
-if( ~isempty(aInds) && (t-ta)>1 )
+% run through algorithm if useful ACK has arrived
+if( ~isempty(aInds) && (t-ta-(max(initTimes)))>1 )
     
     % for each ACK channel
     min_tACK = zeros(size(aInds));max_tACK=min_tACK;
@@ -84,4 +89,7 @@ end
 % reset ACK counter to zero for ACK channels received
 for i = 1:length(aInds)
     tNoACK(aInds(i)) = 0; 
+    if(printDebug)
+        fprintf('\n Step %d GOT ACK\n',t)
+    end
 end
