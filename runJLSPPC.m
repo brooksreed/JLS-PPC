@@ -6,12 +6,19 @@
 
 % calls simJLSPPC (which calls functions in core)
 
+
 %{
 5/28
 - tested with tm=0,1,2
 - tested with tc=0,1,2 (checked XhMPC vs. Xh)
  
 %}
+
+% notes for ACK histories:
+% add in nACKHistory=1 (to start testing)
+% pass in/out the tNoACK
+% anything else needed?? 
+
 
 
 clear variables
