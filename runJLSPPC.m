@@ -6,6 +6,10 @@
 
 % calls simJLSPPC (which calls functions in core)
 
+% add in nACKHistory=1 (to start testing)
+% pass in/out the tNoACK
+% anything else needed?? 
+
 
 clear variables
 close all
