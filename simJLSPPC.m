@@ -1,6 +1,6 @@
 function [results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tap,...
     alphaBar,Pi,Xi,Lambda,umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,...
-    w,v,alpha,beta,gamma)
+    w,v,alpha,beta,gamma,nACKHistory)
 % runs simulation of MJLS/scheduled PPC
 
 % currently restricts to time-invariant constraint input
@@ -8,6 +8,13 @@ function [results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tap,...
 
 % BR, 4/23/2014
 % modifying for delayed ACKs, 6/13/2014
+
+
+
+% pass in/out the tNoACK
+% anything else needed?? 
+
+
 
 
 printouts = 0;
@@ -26,6 +33,9 @@ Nu = NU/Nv;         % per-vehicle
 Nw = size(Bw,2);
 NY = size(C,1);
 Ny = NY/Nv;
+
+% initially no steps since dropped ACK
+tNoACK = zeros(Nv,1);
 
 Umax = repmat(umax,1,Ns+Np);
 Umin = repmat(umin,1,Ns+Np);
@@ -94,8 +104,8 @@ for t = (tm+1):(Ns-1)
 
     % determine ACKs available at this step
     % update Dh (and alphat), and KFstart
-    [Dh,alphat,a,KFstart] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,...
-        Lambda,gamma,t,tm,tc,ta,tap,Nu,Np);    
+    [Dh,alphat,a,KFstart,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,...
+        Lambda,gamma,t,tm,tc,ta,tap,Nu,Np,tNoACK,nACKHistory);    
     
     %%%%%%%
     % run estimator
