@@ -7,6 +7,7 @@
 % calls simJLSPPC (which calls functions in core)
 
 
+
 %{
 5/28
 - tested with tm=0,1,2
@@ -14,16 +15,17 @@
  
 %}
 
-% notes for ACK histories:
-% add in nACKHistory=1 (to start testing)
-% pass in/out the tNoACK
-% anything else needed?? 
 
 
 
 clear variables
 close all
 clc
+
+
+% fix issue with pi, ack history, remove the hardcode pi = ones
+
+nACKHistory = 1;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SYSTEM DEFINITION
@@ -45,9 +47,9 @@ ta = 1; % ACK delay
 sched = 'SISO2_piggyback';
 
 % packet success probabilities
-alphaBar = .8; % controls
-betaBar = .8;  % measurements
-gammaBar = .8; % ACKs
+alphaBar = 1; % controls
+betaBar = 1;  % measurements
+gammaBar = 1; % ACKs
 
 %%%%
 
@@ -105,6 +107,10 @@ for k = 1:Ns
 end
 
 [Pi,Xi,Lambda,tap,Ts] = createSchedule(sched,Nv,Ns,tc);
+
+% TESTING EARLY ACK HISTORY - OVERWRITE PI
+Pi = ones(size(Pi));
+
 if(strfind(sched,'piggyback'))
     % ACK piggybacked to measurement
     gamma = beta;   % overwrite
@@ -113,7 +119,7 @@ Np = NpMult*Ts;
 
 [r] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tap,...
     alphaBar,Pi,Xi,Lambda,umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,...
-    w,v,alpha,beta,gamma);
+    w,v,alpha,beta,gamma,nACKHistory);
 
 % convenient if want to save:
 r.P1 = P1;
