@@ -93,8 +93,8 @@ xIC(2)=0;xIC(1)=5;
 % (IF WANT TO DEBUG CONTROLLER - INIT ESTIMATOR PERFECTLY)
 % xHat1 = xIC;P1 = 1*eye(2);
 
-w = sqrt(W)*randn(1,Ns);
-v = sqrt(V)*randn(1,Ns);
+w = sqrt(W)*randn(size(Bw,1),Ns);
+v = sqrt(V)*randn(size(C,1),Ns);
 
 % packet loss sequences
 beta = zeros(Nv,Ns);alpha = zeros(Nv,Ns);gamma = zeros(Nv,Ns);
@@ -111,6 +111,8 @@ if(strfind(sched,'piggyback'))
     gamma = beta;   % overwrite
 end
 Np = NpMult*Ts;
+
+%% call sim fcn
 
 [r] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tap,...
     alphaBar,Pi,Xi,Lambda,umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,...
