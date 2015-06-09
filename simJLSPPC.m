@@ -1,6 +1,6 @@
 function [results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tap,...
     alphaBar,Pi,Xi,Lambda,umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,...
-    w,v,alpha,beta,gamma,nACKHistory)
+    w,v,alpha,beta,gamma,covPriorAdj,nACKHistory)
 % runs simulation of MJLS/scheduled PPC
 
 % currently restricts to time-invariant constraint input
@@ -12,7 +12,6 @@ function [results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tap,...
 printouts = 0;
 
 % currently always uses alphaBar state prior adjustment
-covPriorAdj = 0;
 if(covPriorAdj)
     disp('COV PRIOR ADJUST ON')
 end
@@ -95,7 +94,7 @@ for t = (tm+1):(Ns-1)
     yh(:,t-tm) = S(:,:,t-tm)*y(:,t-tm);     % available tm steps after sent
 
     % determine ACKs available at this step
-    % update Dh (and alphat), and KFstart
+    % update Dh (and alphat), KFstart, and tNoACK
     [Dh,alphat,a,KFstart,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,...
         Lambda,gamma,t,tm,tc,ta,tap,Nu,Np,tNoACK,nACKHistory);    
     
@@ -111,6 +110,8 @@ for t = (tm+1):(Ns-1)
     end
     
     % run KF from KFstart up until time of recent measurement
+    % pick out history needed
+        
     for td = KFstart:(t-tm)
         if(td<=1)
             AKF = eye(size(A));
@@ -118,20 +119,24 @@ for t = (tm+1):(Ns-1)
             XhIn = [xHat1;zeros(Nu*Np*Nv,1)];
             Pin = P1;
             Uin = zeros(Nu*Np*Nv,1);
-            ut = zeros(NU,1);
+            UHistory = zeros(NU,tNoACK);
+            yIn = yh(:,td);
+            SIn = S(:,:,td);
         else
             AKF = A;
             DKFh = Dh(:,:,td-1);
             XhIn = Xh(:,td-1);
             Pin = P(:,:,td-1);
             Uin = U(:,td-1);
-            ut = utilde(:,td-1);
+            UHistory = utilde(:,td-tNoACK:td-1);
+            yIn = yh(:,td);
+            SIn = S(:,:,td);
         end
         
         % Xh(:,t-tm): xHat_{t-tm|t-tm},bHat_{t-tm-1}
-        [Xh(:,td),P(:,:,td)] = JLSKF(XhIn,Pin,yh(:,td),Uin,DKFh,...
-            Nx,Nv,Nu,Np,S(:,:,td),AKF,Bu,E1,M,C,W,V,...
-            ut,alphaBar,covPriorAdj);
+        [Xh(:,td),P(:,:,td)] = JLSKF(XhIn,Pin,yIn,Uin,DKFh,...
+            Nx,Nv,Nu,Np,SIn,AKF,Bu,E1,M,C,W,V,...
+            UHistory,alphaBar,covPriorAdj,tNoACK);
         
     end
     
