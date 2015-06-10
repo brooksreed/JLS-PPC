@@ -124,11 +124,25 @@ for t = (tm+1):(Ns-1)
     for td = KFstart:(t-tm)
         
         % determine appropriate tNoACK for specific filter step
-        % prepare control options for use in cov. prior adj. 
+        tNoACK_KF = tNoACKSave(td);
         
-        UOptions = [];
-        %UOptions = U(:,(t-tm)-KFstart);
-
+        % constrain to ACK history length if needed
+        if(tNoACK_KF>nACKHistory)
+            tNoACK_KF = nACKHistory;
+        end
+        
+        % prepare control options for use in cov. prior adj.
+        % (fix this later for multivar.)
+        UOptions = zeros(NU,tNoACK_KF);
+        for k = 1:tNoACK_KF
+            if(td-k<1)
+                bTMP = zeros(Nu*Np*Nv,1);
+            else
+                bTMP = bYes(:,td-k);
+            end
+            UOptions(:,k) = E1*M^k*bTMP;
+        end
+        
         if(td<=1)
             AKF = eye(size(A));
             DKFh = makeD(zeros(Nv,1),zeros(Nv,1),Nu,Np);
@@ -150,7 +164,7 @@ for t = (tm+1):(Ns-1)
         % Xh(:,t-tm): xHat_{t-tm|t-tm},bHat_{t-tm-1}
         [Xh(:,td),P(:,:,td)] = JLSKF(XhIn,Pin,yIn,Uin,DKFh,...
             Nx,Nv,Nu,Np,SIn,AKF,Bu,E1,M,C,W,V,...
-            UOptions,alphaBar,covPriorAdj,tNoACK);
+            UOptions,alphaBar,covPriorAdj,tNoACK_KF);
         
     end
     

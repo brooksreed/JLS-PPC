@@ -1,5 +1,5 @@
 function [Xh,P] = JLSKF(Xh,P,y,Uin,Dh,Nx,Nv,Nu,Np,S,A,Bu,E1,M,C,W,V,...
-    uHistory,ab,covPriorAdj,tNoACK)
+    uOptions,ab,covPriorAdj,tNoACK)
 
 % add more Pstars...
 % more streamlined approach vs. hardcode each # steps?
@@ -26,7 +26,7 @@ if( covPriorAdj && (tNoACK>0) )
         
         dU = zeros(1,tNoACK);
         for i = 1:tNoACK
-            dU(:,i) = (ut - uHistory(:,i))*(ut - uHistory(:,i))';
+            dU(:,i) = (ut - uOptions(:,i))*(ut - uOptions(:,i))';
         end
         
         if(tNoACK==1)

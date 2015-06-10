@@ -51,7 +51,7 @@ ta = 1; % ACK delay
 alphaBar = .8; % controls
 betaBar = .7;  % measurements
 gammaBar = .7; % ACKs (if piggyback used, betaBar overrides gammaBar)
-covPriorAdj = 0;
+covPriorAdj = 1;
 
 %%%%%%%%%%%%%%%%%%
 
