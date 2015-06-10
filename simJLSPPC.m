@@ -15,6 +15,8 @@ printouts = 0;
 if(covPriorAdj)
     disp('COV PRIOR ADJUST ON')
 end
+% (think about/fix bug if ta>tm... is tNoACK computed and used in KF
+% correctly?)
 
 % initialization stuff
 Nx = size(A,1);
@@ -25,8 +27,9 @@ Nw = size(Bw,2);
 NY = size(C,1);
 Ny = NY/Nv;
 
-% initially no steps since dropped ACK
-tNoACK = zeros(Nv,1);
+% initialize tNoACK to ones (no ACK for 'step 0')
+tNoACK = ones(Nv,1);
+tNoACKSave = zeros(Nv,Ns);
 
 Umax = repmat(umax,1,Ns+Np);
 Umin = repmat(umin,1,Ns+Np);
@@ -63,7 +66,7 @@ S = zeros(Nv*Ny,Nv*Ny,Ns);
 a = zeros(Nv,Nv,Ns);
 
 utilde = zeros(NU,Ns);
-bYes = zeros(Nu*Np*Nv,1);
+bYes = zeros(Nu*Np*Nv,Ns);
 
 XhMPC = NaN*zeros(Nv*Np*Nu+Nx,tm+tc+1,Ns);	% includes xHatMPC and bHatMPC
 Jcomp = NaN*zeros(1,Ns);
@@ -94,32 +97,44 @@ for t = (tm+1):(Ns-1)
     yh(:,t-tm) = S(:,:,t-tm)*y(:,t-tm);     % available tm steps after sent
 
     % determine ACKs available at this step
-    % update Dh (and alphat), KFstart, and tNoACK
+    % update Dh (and alphat), KFstart
     [Dh,alphat,a,KFstart,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,...
-        Lambda,gamma,t,tm,tc,ta,tap,Nu,Np,tNoACK,nACKHistory);    
+        Lambda,gamma,t,tm,tc,ta,tap,Nu,Np,tNoACK,nACKHistory);  
+    
+    % This updates tNoACK for jump estimator at time t
+    tNoACKSave(:,t) = tNoACK;
     
     %%%%%%%
     % run estimator
     %%%%%%%
     
-    % first compute utilde (control if packets all successful)
+    % compute buffer and control action if all control packets through
     if( (t-tm-1) >= 1)
-        bYes = M*(eye(Np*Nu*Nv)-Ds(:,:,t-tm-1))*bYes + ...
+        if(t-tm-1>1)
+            bPrev = bYes(:,t-tm-2);
+        else
+            bPrev = zeros(Nu*Np*Nv,1);
+        end
+        bYes(:,t-tm-1) = M*(eye(Np*Nu*Nv)-Ds(:,:,t-tm-1))*bPrev + ...
             Ds(:,:,t-tm-1)*U(:,t-tm-1);
-        utilde(:,t-tm-1) = E1*bYes;
+        utilde(:,t-tm-1) = E1*bYes(:,t-tm-1);
     end
     
     % run KF from KFstart up until time of recent measurement
-    % pick out history needed
-        
     for td = KFstart:(t-tm)
+        
+        % determine appropriate tNoACK for specific filter step
+        % prepare control options for use in cov. prior adj. 
+        
+        UOptions = [];
+        %UOptions = U(:,(t-tm)-KFstart);
+
         if(td<=1)
             AKF = eye(size(A));
             DKFh = makeD(zeros(Nv,1),zeros(Nv,1),Nu,Np);
             XhIn = [xHat1;zeros(Nu*Np*Nv,1)];
             Pin = P1;
             Uin = zeros(Nu*Np*Nv,1);
-            UHistory = zeros(NU,tNoACK);
             yIn = yh(:,td);
             SIn = S(:,:,td);
         else
@@ -128,15 +143,14 @@ for t = (tm+1):(Ns-1)
             XhIn = Xh(:,td-1);
             Pin = P(:,:,td-1);
             Uin = U(:,td-1);
-            UHistory = utilde(:,td-tNoACK:td-1);
             yIn = yh(:,td);
-            SIn = S(:,:,td);
+            SIn = S(:,:,td);        
         end
         
         % Xh(:,t-tm): xHat_{t-tm|t-tm},bHat_{t-tm-1}
         [Xh(:,td),P(:,:,td)] = JLSKF(XhIn,Pin,yIn,Uin,DKFh,...
             Nx,Nv,Nu,Np,SIn,AKF,Bu,E1,M,C,W,V,...
-            UHistory,alphaBar,covPriorAdj,tNoACK);
+            UOptions,alphaBar,covPriorAdj,tNoACK);
         
     end
     
@@ -261,17 +275,23 @@ Jsim = jj + xF'*Q*xF;
 
 results.X = X;
 results.u = u;
-results.utilde = utilde;
-results.Xh = Xh;
-results.Jsim = Jsim/Ns;
 results.U = U;
+
+results.utilde = utilde;
+results.bYes = bYes;
+results.tNoACK = tNoACKSave;
+
+results.Xh = Xh;
 results.P = P;
+
 results.XhMPC = XhMPC;
 results.Jcomp = Jcomp;
 results.XPlan = XPlan;
 results.MPCtime = MPCtime;
-results.looptime = looptime;
 results.MPCFail = MPCFail;
+
+results.looptime = looptime;
+results.Jsim = Jsim/Ns;
 results.rmsEstError = nanrms(X(1:Nv,:) - Xh(1:Nv,:),2);
 results.rmsPosError = nanrms(X(1,:),2);
 

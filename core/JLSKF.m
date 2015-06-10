@@ -7,7 +7,7 @@ function [Xh,P] = JLSKF(Xh,P,y,Uin,Dh,Nx,Nv,Nu,Np,S,A,Bu,E1,M,C,W,V,...
 % covariance prior (standard)
 Ppre0 = A*P*A' + W ; %P_{t+1|t}
 
-if(covPriorAdj)
+if( covPriorAdj && (tNoACK>0) )
     
     if(size(A,1)==1)
         % scalar systems:  multiple steps
@@ -30,22 +30,27 @@ if(covPriorAdj)
         end
         
         if(tNoACK==1)
+            
             Pstar1 = (-ab*(ab-1))*dU(:,1);
             Pstar2 = 0;
+            fprintf('\n Pstar1 = %f \n',Pstar1)
+            
         elseif(tNoACK>1)
             
             % uses diff with 1-step prev. plan
             Pstar1 = (- ab^4 + 2*ab^3 - 2*ab^2 + ab)*dU(:,2)^2;
             % uses diff with 2-step prev. plan (earliest)
             Pstar2 = (- ab^4 + 4*ab^3 - 5*ab^2 + 2*ab)*dU(:,1)^2;
-            
+            fprintf('\n Pstar1 = %f, Pstar2 = %f \n',Pstar1,Pstar2)
+
         else
-            % no additional cov.
+            
+            % (fill in with more Pstars...)
             Pstar1 = 0; Pstar2 = 0;
+            
         end
-        Ppre = Ppre0+Pstar1+Pstar2;
         
-        fprintf('\n Pstar1 = %0.4f, Pstar2 = %0.4f \n',Pstar1,Pstar2)
+        Ppre = Ppre0+Pstar1+Pstar2;
         
     else
         disp('WARNING - cov. prior adjust not formulated for multivar. systems')

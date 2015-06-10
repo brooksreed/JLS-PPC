@@ -49,9 +49,9 @@ ta = 1; % ACK delay
 
 % packet success probabilities
 alphaBar = .8; % controls
-betaBar = .8;  % measurements
-gammaBar = .8; % ACKs (if piggyback used, betaBar overrides gammaBar)
-covPriorAdj = 1;
+betaBar = .7;  % measurements
+gammaBar = .7; % ACKs (if piggyback used, betaBar overrides gammaBar)
+covPriorAdj = 0;
 
 %%%%%%%%%%%%%%%%%%
 
@@ -79,8 +79,8 @@ switch sys
         codebook = linspace(umin,umax,nLevels);
 
         % process/measurement noise
-        W = .1;
-        V = .1;%4;
+        W = 1;
+        V = 1;%4;
         % W = 1;
         % V = .1;
         
@@ -98,15 +98,15 @@ switch sys
         Q = 10;
         Qf = 10*Q;
         R = 1;
-        umax = 10;
-        umin = -10;
+        umax = 1;
+        umin = -1;
         Xmax = [];Xmin = [];
-        nLevels = 15;   % quantization levels
+        nLevels = 33;   % quantization levels
         codebook = linspace(umin,umax,nLevels);
 
         % process/measurement noise
-        W = .1;
-        V = .1;%4;
+        W = 1;
+        V = 1;%4;
         % W = 1;
         % V = .1;
         
@@ -140,6 +140,9 @@ for k = 1:Ns
     alpha(:,k) = (sign(rand(Nv,1) - (1-(alphaBar)))*0.5 + 0.5);
     gamma(:,k) = (sign(rand(Nv,1) - (1-(gammaBar)))*0.5 + 0.5);
 end
+
+alpha(:,1:11) = [1 1 0 0 1 1 0 1 0 0 1];
+beta(:,1:11) =  [1 1 1 0 1 1 1 0 0 0 1];
 
 [Pi,Xi,Lambda,tap,Ts] = createSchedule(sched,Nv,Ns,tc);
 
@@ -219,10 +222,17 @@ else
     legend([hx hxh hc hb],'X','XHat','c loss','m loss')
 end
 
-
 subplot(3,1,3)
 stairs(0:Ns-1,r.u,'k')
 hold on
-stairs(0:Ns-1,r.w,'b:')
-legend('u','w')
+stairs(0:Ns-1,r.utilde,'b:')
+legend('u true','u planned')
+%stairs(0:Ns-1,r.w,'b:')
+%legend('u','w')
 xlabel('time step')
+
+if(size(r.P,1)==1)
+    figure
+    plot(squeeze(r.P))
+end
+

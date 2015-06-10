@@ -20,18 +20,18 @@ function [Dh,alphat,a,KFstart,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,..
 
 printDebug = 1;
 
+% update TRUE tNoACK
 tNoACK  = tNoACK+1; % always increment 1 step at beginning
 if(printDebug)
     fprintf('\ntNoACK=%d\n',tNoACK)
 end
 
+% tNoACK used by Algorithm
 % limit "lookback" to the length of the ACK history sent
+tNoACKAlg = tNoACK;
 for i = 1:length(tNoACK)
-    if(tNoACK(i) > nACKHistory)
-        tNoACK(i) = nACKHistory;
-        if(printDebug)
-            fprintf('\n Step %d WARNING: #dropped ACKs > ACK history\n',t)
-        end
+    if(tNoACKAlg(i) > nACKHistory)
+        tNoACKAlg(i) = nACKHistory;
     end
 end
 
@@ -42,7 +42,7 @@ aInds = find(diag(a(:,:,t-ta)));
 
 % check at startup - ack referencing negative time
 if(~isempty(aInds))
-    initTimes = tNoACK(aInds);
+    initTimes = tNoACKAlg(aInds);
 end
 
 % run through algorithm if useful ACK has arrived
@@ -52,7 +52,8 @@ if( ~isempty(aInds) && (t-ta-(max(initTimes)))>1 )
     min_tACK = zeros(size(aInds));max_tACK=min_tACK;
     for i = aInds
         % find time range for new ACKs
-        tACK{i} = t-ta-tap(i)-tNoACK(i):t-ta-tap(i);
+        % (furthest back in time ACK history will be useful)
+        tACK{i} = t-ta-tap(i)-tNoACKAlg(i):t-ta-tap(i);
         tACK{i} = tACK{i}(tACK{i}>tc);
         min_tACK(i) = min(tACK{i});
         max_tACK(i) = max(tACK{i});
@@ -88,8 +89,18 @@ end
 
 % reset ACK counter to zero for ACK channels received
 for i = 1:length(aInds)
-    tNoACK(aInds(i)) = 0; 
+    tNoACK(aInds(i)) = 0;
     if(printDebug)
-        fprintf('\n Step %d GOT ACK\n',t)
+        fprintf('\n Step %d GOT ACK, channel %d \n',t,i)
     end
 end
+
+if(printDebug)
+    for i = 1:length(tNoACK)
+        if(tNoACK(i) > nACKHistory)
+            fprintf('\n Step %d WARNING: #dropped ACKs > ACK history, channel %d \n',t,i)
+        end
+    end
+end
+
+
