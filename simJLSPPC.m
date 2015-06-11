@@ -55,9 +55,9 @@ U = zeros(Nu*Np*Nv,Ns);
 % initialize Dhat and Dyes
 Dh = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns+tc);   % D hat for estimator
 Ds = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns+tc);   % used to track utilde for cov. prior
-alphat = repmat(alphaBar,[1 Ns]);
+alphaHat = repmat(alphaBar,[1 Ns]);
 for t = (tc+1):Ns
-    Dh(:,:,t) = makeD(Pi(:,t-tc),alphat(:,t-tc),Nu,Np);
+    Dh(:,:,t) = makeD(Pi(:,t-tc),alphaHat(:,t-tc),Nu,Np);
     Ds(:,:,t) = makeD(Pi(:,t-tc),Pi(:,t-tc),Nu,Np);
 end
 
@@ -105,9 +105,10 @@ for t = (tm+1):(Ns-1)
     end
     
     % determine ACKs available at this step
-    % update Dh (and alphat), KFstart
-    [Dh,alphat,a,KFstart,gotACK,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,...
+    % update Dh (and alphaHat), KFstart
+    [Dh,alphaHat,a,KFstart,gotACK,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphaHat,...
         Lambda,gamma,t,tm,tc,ta,tap,Nu,Np,tNoACK,nACKHistory,printDebug);
+    disp(tNoACK)
     
     %%%%%%%
     % run estimator
@@ -133,17 +134,19 @@ for t = (tm+1):(Ns-1)
             % determine appropriate tNoACK for specific filter step
             % td is the a posteriori estimate time
             % ACK relates to control action needed for prior (td-1)
-            tNoACK
             tNoACK_KF = zeros(Nv);
             if(td>0)
                 for i = 1:Nv
-                    tNoACK_KF(i) = tNoACK(i,td)
+                    tNoACK_KF(i) = tNoACK(i,td);
                 end
             end
             
             % constrain to ACK history length if needed
             if(tNoACK_KF>nACKHistory)
                 tNoACK_KF = nACKHistory;
+                if(printDebug)
+                    disp('truncating ACK history')
+                end
             end
             
             % prepare control options for use in cov. prior adj.

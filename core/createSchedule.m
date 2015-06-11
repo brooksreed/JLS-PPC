@@ -167,7 +167,12 @@ if(isempty(strfind(sched,'noACK')))
         if(piPos>lambdaPos)
             lambdaPos = lambdaPos + Ts;
         end
-        tap(i) = lambdaPos - piPos;
+        try
+            tap(i) = lambdaPos - piPos;
+        catch
+            % (SISO2ALLCONTROL -- fix eventually)
+            tap(i) = 0;
+        end
     end
 end
 

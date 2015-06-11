@@ -31,14 +31,16 @@ sys = 'SISO';
 %sched = 'SISO4_noACK';
 %sched = 'SISO2_noACK';
 %sched = 'SISO2_piggyback';
+
+
 %sched = 'SISO2ALLCONTROL_noACK';
-%sched = 'SISO2ALLCONTROL_piggyback';
-sched = 'SISOALL_piggyback';
+sched = 'SISO2ALLCONTROL_piggyback';
+%sched = 'SISOALL_piggyback';
 %sched = 'SISOALL_noACK';
 
 % # ACK Histories sent (makes most sense to be multiple of schedule length)
 % For 'SINGLE ACK': set nACKHistory = Ts (schedule length)
-nACKHistory = 100;
+nACKHistory = 5;
 
 % NOTE:
 % With very long ACK history, a posteriori estimate should have no effects
@@ -48,7 +50,7 @@ nACKHistory = 100;
 % delays
 tm = 1; % meas delay
 tc = 1; % control delay
-ta = 2; % ACK delay
+ta = 1; % ACK delay
 
 % packet success probabilities
 alphaBar = .5; % controls
