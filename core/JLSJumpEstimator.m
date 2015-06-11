@@ -1,5 +1,5 @@
-function [Dh,alphat,a,KFstart,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,...
-    Lambda,gamma,t,tm,tc,ta,tap,Nu,Np,tNoACK,nACKHistory)
+function [Dh,alphat,a,KFstart,gotACK,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,...
+    Lambda,gamma,t,tm,tc,ta,tap,Nu,Np,tNoACK,nACKHistory,printDebug)
 % Jump estimator and prep for (lossy,delayed) KF
 % [Dh,alphat,a,KFstart] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,...
 %    Lambda,gamma,t,tm,tc,ta,tap,Nu,Np)
@@ -17,19 +17,18 @@ function [Dh,alphat,a,KFstart,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,..
 
 % initial approach - clarity over efficiency
 % refactor later?
+% update help @ top...
 
-printDebug = 1;
+nACKs = size(tNoACK,1);
 
-% update TRUE tNoACK
-tNoACK  = tNoACK+1; % always increment 1 step at beginning
-if(printDebug)
-    fprintf('\ntNoACK=%d\n',tNoACK)
-end
-
-% tNoACK used by Algorithm
+% tNoACK for step t-1 used by algorithm
 % limit "lookback" to the length of the ACK history sent
-tNoACKAlg = tNoACK;
-for i = 1:length(tNoACK)
+if((t-1)>ta)
+    tNoACKAlg = tNoACK(:,t-ta-1);
+else
+    tNoACKAlg = zeros(nACKs);
+end
+for i = 1:nACKs
     if(tNoACKAlg(i) > nACKHistory)
         tNoACKAlg(i) = nACKHistory;
     end
@@ -37,19 +36,25 @@ end
 
 % determine ACKs available at this step
 % at step t, ACKs are sent at t-ta
-a(:,:,t-ta) = diag(Lambda(:,t-ta).*gamma(:,t-ta));
-aInds = find(diag(a(:,:,t-ta)));
-
-% check at startup - ack referencing negative time
-if(~isempty(aInds))
-    initTimes = tNoACKAlg(aInds);
+if(t-ta<1)
+    aInds = [];
+else
+    a(:,:,t-ta) = diag(Lambda(:,t-ta).*gamma(:,t-ta));
+    aInds = find(diag(a(:,:,t-ta)));
 end
 
+% check at startup - ack referencing negative time
+% if(~isempty(aInds))
+%     initTimes = tNoACKAlg(aInds);
+% end
+
 % run through algorithm if useful ACK has arrived
-if( ~isempty(aInds) && (t-ta-(max(initTimes)))>1 )
+% && (t-ta-(max(initTimes)))>1
+if( ~isempty(aInds) && (t-ta-max(tap)>tc))
     
     % for each ACK channel
     min_tACK = zeros(size(aInds));max_tACK=min_tACK;
+    tACK = cell(1,length(aInds));
     for i = aInds
         % find time range for new ACKs
         % (furthest back in time ACK history will be useful)
@@ -79,7 +84,8 @@ if( ~isempty(aInds) && (t-ta-(max(initTimes)))>1 )
     end
     
     % if ACKs, KF start goes back to oldest useful (eg new) ACK
-    KFstart = min((t-tm),backupStart);
+    % KF start is the a posteriori step
+    KFstart = min((t-tm),(backupStart));
     
 else
     
@@ -87,18 +93,61 @@ else
     
 end
 
-% reset ACK counter to zero for ACK channels received
+gotACK = zeros(size(a,3));
+% update gotACK flag for each channel for KF to use
 for i = 1:length(aInds)
-    tNoACK(aInds(i)) = 0;
+    gotACK(aInds(i)) = 1;
     if(printDebug)
-        fprintf('\n Step %d GOT ACK, channel %d \n',t,i)
+        fprintf('\nt=%d GOT ACK, channel %d \n',t,i)
+        % only going to backup if got ACK...
+    end
+end
+
+
+% increment true tNoACK (into the future)
+if( (t-ta-1)>0)
+    
+    if(t-ta+10>length(tNoACK))
+        maxadd = length(tNoACK);
+    else
+        maxadd = t-ta+10;
+    end
+    startVal = tNoACK(:,t-ta-1);
+    newVec = ones(1,maxadd - (t-ta)+1);
+    newVec(1,:) = 0:(maxadd - (t-ta));
+    tNoACK(:,(t-ta):maxadd)  =  newVec + startVal;
+    %tNoACK(:,t-ta+1) = tNoACK(:,t-ta)+1;
+    
+    % update tNoACKSave properly
+    for i = 1:nACKs
+        if(gotACK(i))
+            % if Jump Estimator says got ACK
+            tNoACK(i,t-ta) = 0;
+            tBackup = t-nACKHistory-ta;
+            if(tBackup<1)
+                tBackup = 1;
+            end
+            % update nACKHistory to past
+            tNoACK(i,tBackup:t-ta) = 0;
+            % increment future
+            tNoACK(i,t-ta+1:maxadd) = 1:(maxadd-(t-ta));
+        end
     end
 end
 
 if(printDebug)
-    for i = 1:length(tNoACK)
+    for i = 1:nACKs
+        fprintf('\nt=%d, Jump Estimator tNoACK=%d\n',t,tNoACK(i,t))
+    end
+    if(exist('backupStart','var'))
+        fprintf('furthest back posterior estimate: t=%d\n',backupStart)
+    end
+end
+
+if(printDebug)
+    for i = 1:nACKs
         if(tNoACK(i) > nACKHistory)
-            fprintf('\n Step %d WARNING: #dropped ACKs > ACK history, channel %d \n',t,i)
+            fprintf('\nt=%d WARNING: #dropped ACKs > ACK history, channel %d \n',t,i)
         end
     end
 end

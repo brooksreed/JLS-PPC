@@ -31,11 +31,14 @@ sys = 'SISO';
 %sched = 'SISO4_noACK';
 %sched = 'SISO2_noACK';
 %sched = 'SISO2_piggyback';
+%sched = 'SISO2ALLCONTROL_noACK';
+%sched = 'SISO2ALLCONTROL_piggyback';
 sched = 'SISOALL_piggyback';
+%sched = 'SISOALL_noACK';
 
 % # ACK Histories sent (makes most sense to be multiple of schedule length)
 % For 'SINGLE ACK': set nACKHistory = Ts (schedule length)
-nACKHistory = 2;
+nACKHistory = 100;
 
 % NOTE:
 % With very long ACK history, a posteriori estimate should have no effects
@@ -45,18 +48,18 @@ nACKHistory = 2;
 % delays
 tm = 1; % meas delay
 tc = 1; % control delay
-ta = 1; % ACK delay
+ta = 2; % ACK delay
 
 % packet success probabilities
-alphaBar = .8; % controls
-betaBar = .7;  % measurements
-gammaBar = .7; % ACKs (if piggyback used, betaBar overrides gammaBar)
+alphaBar = .5; % controls
+betaBar = 1;  % measurements
+gammaBar = 1; % ACKs (if piggyback used, betaBar overrides gammaBar)
 covPriorAdj = 1;
 
 %%%%%%%%%%%%%%%%%%
 
-Ns = 30; % sim length
-NpMult = 5; % the MPC horizon Np = Ts*NpMult 
+Ns = 20; % sim length
+NpMult = 4; % the MPC horizon Np = Ts*NpMult 
 Nv = 1;   % # vehicles (comms channels)
 
 switch sys
@@ -141,8 +144,8 @@ for k = 1:Ns
     gamma(:,k) = (sign(rand(Nv,1) - (1-(gammaBar)))*0.5 + 0.5);
 end
 
-alpha(:,1:11) = [1 1 0 0 1 1 0 1 0 0 1];
-beta(:,1:11) =  [1 1 1 0 1 1 1 0 0 0 1];
+%alpha(:,1:11) = [1 1 0 0 1 1 0 1 0 0 1];
+%beta(:,1:11) =  [1 1 1 0 1 1 0 0 1 0 1];
 
 [Pi,Xi,Lambda,tap,Ts] = createSchedule(sched,Nv,Ns,tc);
 

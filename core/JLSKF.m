@@ -1,5 +1,5 @@
 function [Xh,P] = JLSKF(Xh,P,y,Uin,Dh,Nx,Nv,Nu,Np,S,A,Bu,E1,M,C,W,V,...
-    uOptions,ab,covPriorAdj,tNoACK)
+    uOptions,ab,covPriorAdj,tNoACK,t,tp)
 
 % add more Pstars...
 % more streamlined approach vs. hardcode each # steps?
@@ -14,7 +14,7 @@ if( covPriorAdj && (tNoACK>0) )
         % (need to load-in "lookup table")
         % work on naming vs. paper
         if(tNoACK>2)
-            disp('ERROR - ACKDropped too large, using Pstar2')
+            fprintf('\nt=%d, tp=%d, KF ERROR - ACKDropped too large, using Pstar2\n',t,tp)
             tNoACK=2;
         end
         
@@ -29,28 +29,30 @@ if( covPriorAdj && (tNoACK>0) )
             dU(:,i) = (ut - uOptions(:,i))*(ut - uOptions(:,i))';
         end
         
+        Pstar = zeros(1,10);
         if(tNoACK==1)
             
-            Pstar1 = (-ab*(ab-1))*dU(:,1);
-            Pstar2 = 0;
-            fprintf('\n Pstar1 = %f \n',Pstar1)
+            Pstar(1) = (-ab*(ab-1))*dU(:,1);
+            %Pstar2 = 0;
+            fprintf('\nt=%d, tp=%d, Pstar1 = %f \n',t, tp, Pstar(1))
             
-        elseif(tNoACK>1)
+        elseif(tNoACK==2)
             
             % uses diff with 1-step prev. plan
-            Pstar1 = (- ab^4 + 2*ab^3 - 2*ab^2 + ab)*dU(:,2)^2;
+            Pstar(1) = (- ab^4 + 2*ab^3 - 2*ab^2 + ab)*dU(:,2)^2;
             % uses diff with 2-step prev. plan (earliest)
-            Pstar2 = (- ab^4 + 4*ab^3 - 5*ab^2 + 2*ab)*dU(:,1)^2;
-            fprintf('\n Pstar1 = %f, Pstar2 = %f \n',Pstar1,Pstar2)
+            Pstar(2) = (- ab^4 + 4*ab^3 - 5*ab^2 + 2*ab)*dU(:,1)^2;
+            fprintf('\nt=%d, tp=%d, Pstar1 = %f, Pstar2 = %f \n',t,tp,Pstar(1),Pstar(2))
 
-        else
+        elseif(tNoACK>2)
             
             % (fill in with more Pstars...)
-            Pstar1 = 0; Pstar2 = 0;
+            %Pstar1 = 0.00111; Pstar2 = 0.00222; Pstar3 = 0.00333; 
+            disp('(Pstar>2)')
             
         end
         
-        Ppre = Ppre0+Pstar1+Pstar2;
+        Ppre = Ppre0+sum(Pstar);
         
     else
         disp('WARNING - cov. prior adjust not formulated for multivar. systems')
