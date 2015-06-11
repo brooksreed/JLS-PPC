@@ -94,8 +94,10 @@ if( ~isempty(aInds) && checkStart )
     
     % KFstart is the oldest (a posteriori) step of backup-rerun
     % KFstart uses the oldest updated Dhat(backupStart)
-    KFstart = min((t-tm),(backupStart));
-    
+    KFstart = min((t-tm),(backupStart+1));
+    if(printDebug)
+       fprintf('\nt=%d, JE t-tm=%d, backupStart+1=%d\n',t,t-tm,backupStart+1) 
+    end
 else
     
     KFstart = t - tm;   % usual 1-step update
@@ -107,7 +109,7 @@ gotACK = zeros(size(a,3));
 for i = 1:length(aInds)
     gotACK(aInds(i)) = 1;
     if(printDebug)
-        fprintf('\nt=%d GOT ACK, channel %d \n',t,i)
+        fprintf('\nt=%d, JE GOT ACK, channel %d \n',t,i)
         % only going to backup if got ACK...
     end
 end
@@ -131,7 +133,8 @@ if( (t-ta-1)>0 )
     end
     startVal = tNoACK(:,t-ta-1);
     %newVec = ones(1,maxadd - (t-ta)+1);
-    newVec1 = 0:(maxadd - (t-ta));
+    %newVec1 = 0:(maxadd - (t-ta));
+    newVec1 = 1:(maxadd-(t-ta)+1);
     % increment future starting from current value
     tNoACK(:,(t-ta):maxadd)  =  newVec1 + startVal;
     
@@ -150,24 +153,24 @@ if( (t-ta-1)>0 )
             % increment future, starting at 1
             newVec2 = 1:(maxadd - (t-ta));
             tNoACK(i,(t-ta+1):maxadd) = newVec2;
-            
+                        
         end
     end
 end
 
-if(printDebug)
+if(printDebug && (t-ta>1) )
     for i = 1:nACKs
-        fprintf('\nt=%d, Jump Estimator tNoACK=%d\n',t,tNoACK(i,t))
+        fprintf('\nt=%d, JE tNoACK(t-ta)=%d, tNoACK(t)=%d\n',t,tNoACK(t-ta),tNoACK(i,t))
     end
     if(exist('backupStart','var'))
-        fprintf('furthest back posterior estimate: t=%d\n',backupStart)
+        fprintf('    JE furthest back posterior estimate: t=%d\n',backupStart)
     end
 end
 
 if(printDebug)
     for i = 1:nACKs
         if(tNoACK(i) > nACKHistory)
-            fprintf('\nt=%d WARNING: #dropped ACKs > ACK history, channel %d \n',t,i)
+            fprintf('\nt=%d, JE WARNING: #dropped ACKs > ACK history, channel %d \n',t,i)
         end
     end
 end

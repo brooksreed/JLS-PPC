@@ -34,8 +34,8 @@ sys = 'SISO';
 
 
 %sched = 'SISO2ALLCONTROL_noACK';
-sched = 'SISO2ALLCONTROL_piggyback';
-%sched = 'SISOALL_piggyback';
+%sched = 'SISO2ALLCONTROL_piggyback';
+sched = 'SISOALL_piggyback';
 %sched = 'SISOALL_noACK';
 
 % # ACK Histories sent (makes most sense to be multiple of schedule length)
@@ -50,7 +50,7 @@ nACKHistory = 5;
 % delays
 tm = 1; % meas delay
 tc = 1; % control delay
-ta = 1; % ACK delay
+ta = 2; % ACK delay
 
 % packet success probabilities
 alphaBar = .5; % controls
@@ -147,7 +147,7 @@ for k = 1:Ns
 end
 
 %alpha(:,1:11) = [1 1 0 0 1 1 0 1 0 0 1];
-%beta(:,1:11) =  [1 1 1 0 1 1 0 0 1 0 1];
+beta(:,1:11) =  [1 1 1 1 0 0 1 1 1 1 1];
 
 [Pi,Xi,Lambda,tap,Ts] = createSchedule(sched,Nv,Ns,tc);
 

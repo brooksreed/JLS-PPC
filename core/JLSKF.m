@@ -14,7 +14,7 @@ if( covPriorAdj && (tNoACK>0) )
         % (need to load-in "lookup table")
         % work on naming vs. paper
         if(tNoACK>2)
-            fprintf('\nt=%d, tp=%d, KF ERROR - ACKDropped too large, using Pstar2\n',t,tp)
+            fprintf('\nt=%d, KF tp=%d ERROR - ACKDropped too large, using Pstar2\n',t,tp)
             tNoACK=2;
         end
         
@@ -34,7 +34,7 @@ if( covPriorAdj && (tNoACK>0) )
             
             Pstar(1) = (-ab*(ab-1))*dU(:,1);
             %Pstar2 = 0;
-            fprintf('\nt=%d, tp=%d, Pstar1 = %f \n',t, tp, Pstar(1))
+            fprintf('\nt=%d, KF tp=%d, Pstar1 = %f \n',t, tp, Pstar(1))
             
         elseif(tNoACK==2)
             
@@ -42,7 +42,7 @@ if( covPriorAdj && (tNoACK>0) )
             Pstar(1) = (- ab^4 + 2*ab^3 - 2*ab^2 + ab)*dU(:,2)^2;
             % uses diff with 2-step prev. plan (earliest)
             Pstar(2) = (- ab^4 + 4*ab^3 - 5*ab^2 + 2*ab)*dU(:,1)^2;
-            fprintf('\nt=%d, tp=%d, Pstar1 = %f, Pstar2 = %f \n',t,tp,Pstar(1),Pstar(2))
+            fprintf('\nt=%d, KF tp=%d, Pstar1 = %f, Pstar2 = %f \n',t,tp,Pstar(1),Pstar(2))
 
         elseif(tNoACK>2)
             

@@ -6,6 +6,10 @@ function [results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tap,...
 % currently restricts to time-invariant constraint input
 % (code in the sim converts to fcn of time)
 
+% FIX/UPDATE NOTATION
+% CLEAN UP PRINTOUTS, NOTE WHERE SINGLE CHANNEL ONLY
+
+
 % BR, 4/23/2014
 % modifying for delayed ACKs, 6/13/2014
 
@@ -100,15 +104,20 @@ for t = (tm+1):(Ns-1)
         fprintf('\n~~~STEP t=%d AT ESTIMATOR~~~\n',t)
         % (do for multi-channel eventually)
         if(S(:,:,t-tm)==1)
-            fprintf('\nt=%d, t-%d RX success\n',t,tm)
+            fprintf('\nt=%d, t-%d Meas RX success\n',t,tm)
         end
     end
     
     % determine ACKs available at this step
     % update Dh (and alphaHat), KFstart
+    % uses tNoACK(t-ta-1) to determine how far back to update
+    % updates tNoACK(t-ta) and history based on ACKs RX'd now
+    % also increments a lookahead of tNoACK(t-ta+1 --> future)
     [Dh,alphaHat,a,KFstart,gotACK,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphaHat,...
         Lambda,gamma,t,tm,tc,ta,tap,Nu,Np,tNoACK,nACKHistory,printDebug);
-    disp(tNoACK)
+    if(printDebug)
+        disp(tNoACK)
+    end
     
     %%%%%%%
     % run estimator
@@ -134,10 +143,17 @@ for t = (tm+1):(Ns-1)
             % determine appropriate tNoACK for specific filter step
             % td is the a posteriori estimate time
             % ACK relates to control action needed for prior (td-1)
+            % relevant tNoACK = 
             tNoACK_KF = zeros(Nv);
-            if(td>0)
-                for i = 1:Nv
-                    tNoACK_KF(i) = tNoACK(i,td);
+            
+            % we know tNoACK(t-ta)=0 if ACK Rx'd at t
+            %tDiff = t-td;
+            % when tDiff = ta, tNoACK is zero (t-ta)
+            % 
+            
+            for i = 1:Nv
+                if(td-1-tap(i)>0)
+                    tNoACK_KF(i) = tNoACK(i,td+tap(i)-1);
                 end
             end
             
@@ -189,7 +205,9 @@ for t = (tm+1):(Ns-1)
             UOptions,alphaBar,covPriorAdj,tNoACK_KF,t,td);
         
         if(printDebug)
-            fprintf('\nt=%d, KF td=%d, tNoACK_KF=%d\n',t,td,tNoACK_KF)
+            if(Nv==1)
+                fprintf('\nt=%d, KF td=%d, tNoACK_KF(%d)=%d\n',t,td,td+tap(1)-1,tNoACK_KF)
+            end
             if(size(A,1)==1)
                 % only print estimate for scalar sys
                 fprintf('Xh(:,1:%d)=\n',td);disp(Xh(:,1:td)')
