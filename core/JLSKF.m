@@ -1,7 +1,7 @@
 function [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
     E,M,C,W,V,t,tKF,tNoACK,covPriorAdj,uOptions,alpha_cBar)
 % [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
-%     E,M,C,W,V,t,tKF,tNoACK,covPriorAdj,uOptions,alphaBar)
+%     E,M,C,W,V,t,tKF,tNoACK,covPriorAdj,uOptions,alpha_cBar)
 %
 % XHat is state estimate (system + buffer)
 % P is error cov. 
@@ -12,7 +12,7 @@ function [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
 % W, V: process, meas. noise covariances
 % uOptions: NU x tNoACK vector of alternate control actions that might be
 %   applied depending on control packet success history
-% alphaBar: control packet success probability
+% alpha_cBar: control packet success probability
 % covPriorAdj: toggles using the adjustment
 % tNoACK: time since ACK received (for covPriorAdj)
 % t: true time at estimator when fcn is called (mostly for debugging)

@@ -59,8 +59,8 @@ D_cHat = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns+tc);   % D hat for estimator
 DcNoLoss = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns+tc);   % used to track utilde for cov. prior
 alphaHat = repmat(alpha_cBar,[1 Ns]);
 for t = (tc+1):Ns
-    D_cHat(:,:,t) = makeD(Pi_c(:,t-tc),alphaHat(:,t-tc),Nu,Np);
-    DcNoLoss(:,:,t) = makeD(Pi_c(:,t-tc),Pi_c(:,t-tc),Nu,Np);
+    D_cHat(:,:,t) = makeD_c(Pi_c(:,t-tc),alphaHat(:,t-tc),Nu,Np);
+    DcNoLoss(:,:,t) = makeD_c(Pi_c(:,t-tc),Pi_c(:,t-tc),Nu,Np);
 end
 
 D_c = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns);    % true D
@@ -95,14 +95,15 @@ for t = (tm+1):(Ns-1)
     
     % determine which measurements are available at estimator at this step
     % at step t, meas. are sent at t-tm
-    D_m(:,:,t-tm) = makeS(Pi_m(:,t-tm),alpha_m(:,t-tm),Ny);
+    D_m(:,:,t-tm) = makeD_m(Pi_m(:,t-tm),alpha_m(:,t-tm),Ny);
     yh(:,t-tm) = D_m(:,:,t-tm)*y(:,t-tm);     % available tm steps after sent
     
     if(printDebug)
         fprintf('\n~~~STEP t=%d AT ESTIMATOR~~~\n',t)
-        % (do for multi-channel eventually)
-        if(D_m(:,:,t-tm)==1)
-            fprintf('\nt=%d, t-%d Meas RX success\n',t,tm)
+        for i = 1:Nv
+            if(Pi_m(i,t-tm)*alpha_m(i,t-tm)==1)
+                fprintf('\nt=%d, t-%d Meas %d RX success\n',t,i,tm)
+            end
         end
     end
     
@@ -157,7 +158,6 @@ for t = (tm+1):(Ns-1)
             end
             
             % prepare control options for use in cov. prior adj.
-            % (fix this later for multivar.)
             UOptions = zeros(NU,tNoACK_KF);
             for k = 1:tNoACK_KF
                 if(td-k<1)
@@ -177,7 +177,7 @@ for t = (tm+1):(Ns-1)
         
         if(td<=1)
             AKF = eye(size(A));
-            DKFh = makeD(zeros(Nv,1),zeros(Nv,1),Nu,Np);
+            DKFh = makeD_c(zeros(Nv,1),zeros(Nv,1),Nu,Np);
             XhIn = [xHat1;zeros(Nu*Np*Nv,1)];
             Pin = P1;
             Uin = zeros(Nu*Np*Nv,1);
@@ -199,8 +199,9 @@ for t = (tm+1):(Ns-1)
             t,td,tNoACK_KF,covPriorAdj,UOptions,alpha_cBar);
        
         if(printDebug)
-            if(Nv==1)
-                fprintf('\nt=%d, KF td=%d, tNoACK_KF(%d)=%d\n',t,td,td+tac(1)-1,tNoACK_KF)
+            for i = 1:Nv
+                fprintf('\nt=%d, KF td=%d, tNoACK_KF(%d)=%d\n',...
+                    t,td,td+tac(i)-1,tNoACK_KF(i))
             end
             if(size(A,1)==1)
                 % only print estimate for scalar sys
@@ -289,9 +290,9 @@ for t = (tm+1):(Ns-1)
     % true system propagation
     % reshape into MJLS form (for step t), uses D_t(pi(t-tc),alpha_c(t-tc))
     if(t<=tc)
-        D_c(:,:,t) = makeD(zeros(1,Nv),zeros(1,Nv),Nu,Np);
+        D_c(:,:,t) = makeD_c(zeros(1,Nv),zeros(1,Nv),Nu,Np);
     else
-        D_c(:,:,t) = makeD(Pi_c(:,t-tc),alpha_c(:,t-tc),Nu,Np);
+        D_c(:,:,t) = makeD_c(Pi_c(:,t-tc),alpha_c(:,t-tc),Nu,Np);
     end
     I = eye(size(D_c(:,:,1)));
     AA = [A,Bu*E*M*(I-D_c(:,:,t));zeros(Nv*Np*Nu,Nx),M*(I-D_c(:,:,t))];

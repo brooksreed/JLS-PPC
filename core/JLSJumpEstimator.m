@@ -91,7 +91,7 @@ if( ~isempty(aInds) && checkStart )
     
     % update Dhat using alphahat
     for tprime = backupStart:backupEnd
-        D_cHat(:,:,tprime) = makeD(Pi_c(:,tprime-tc),alpha_cHat(:,tprime-tc),...
+        D_cHat(:,:,tprime) = makeD_c(Pi_c(:,tprime-tc),alpha_cHat(:,tprime-tc),...
             Nu,Np);
     end
     
@@ -161,7 +161,7 @@ end
 
 if(printDebug && (t-ta>1) )
     for i = 1:nACKs
-        fprintf('\nt=%d, JE tNoACK(t-ta)=%d, tNoACK(t)=%d\n',t,tNoACK(t-ta),tNoACK(i,t))
+        fprintf('\nt=%d, JE tNoACK(t-ta)=%d, tNoACK(t)=%d\n',t,tNoACK(i,t-ta),tNoACK(i,t))
     end
     if(exist('backupStart','var'))
         fprintf('    JE furthest back posterior estimate: t=%d\n',backupStart)
