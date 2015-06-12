@@ -50,12 +50,12 @@ nACKHistory = 5;
 % delays
 tm = 1; % meas delay
 tc = 1; % control delay
-ta = 3; % ACK delay
+ta = 1; % ACK delay
 
 % packet success probabilities
 alphaBar = .5; % controls
-betaBar = 1;  % measurements
-gammaBar = 1; % ACKs (if piggyback used, betaBar overrides gammaBar)
+betaBar = .7;  % measurements
+gammaBar = .7; % ACKs (if piggyback used, betaBar overrides gammaBar)
 covPriorAdj = 1;
 
 %%%%%%%%%%%%%%%%%%
@@ -147,7 +147,7 @@ for k = 1:Ns
 end
 
 %alpha(:,1:11) = [1 1 0 0 1 1 0 1 0 0 1];
-beta(:,1:11) =  [1 1 1 1 0 0 1 1 1 1 1];
+beta(:,1:11) =  [1 1 1 0 1 1 0 0 0 1 1];
 
 [Pi,Xi,Lambda,tap,Ts] = createSchedule(sched,Nv,Ns,tc);
 
