@@ -1,20 +1,37 @@
-function [Xh,P] = JLSKF(Xh,P,y,Uin,Dh,Nx,Nv,Nu,Np,S,A,Bu,E1,M,C,W,V,...
-    uOptions,ab,covPriorAdj,tNoACK,t,tp)
+function [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
+    E,M,C,W,V,t,tKF,tNoACK,covPriorAdj,uOptions,alpha_cBar)
+% [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
+%     E,M,C,W,V,t,tKF,tNoACK,covPriorAdj,uOptions,alphaBar)
+%
+% XHat is state estimate (system + buffer)
+% P is error cov. 
+% yKF: meas into KF, D_m: meas success matrix
+% USent: control plan as sent (used if packet successful)
+% D_cHat: estimate of control jump variable
+% (std. system vars)
+% W, V: process, meas. noise covariances
+% uOptions: NU x tNoACK vector of alternate control actions that might be
+%   applied depending on control packet success history
+% alphaBar: control packet success probability
+% covPriorAdj: toggles using the adjustment
+% tNoACK: time since ACK received (for covPriorAdj)
+% t: true time at estimator when fcn is called (mostly for debugging)
+% tKF: physical time step KF is updating -- xHat(tKF|tKF) posterior
+
 
 % add more Pstars...
 % more streamlined approach vs. hardcode each # steps?
+% (need to load-in "lookup table")
 
 % covariance prior (standard)
 Ppre0 = A*P*A' + W ; %P_{t+1|t}
 
 if( covPriorAdj && (tNoACK>0) )
     
+    % UPDATE SO WORKS FOR SISO SYS, NOT JUST SCALAR
     if(size(A,1)==1)
-        % scalar systems:  multiple steps
-        % (need to load-in "lookup table")
-        % work on naming vs. paper
         if(tNoACK>2)
-            fprintf('\nt=%d, KF tp=%d ERROR - ACKDropped too large, using Pstar2\n',t,tp)
+            fprintf('\nt=%d, KF tKF=%d ERROR - ACKDropped too large, using Pstar2\n',t,tKF)
             tNoACK=2;
         end
         
@@ -22,7 +39,7 @@ if( covPriorAdj && (tNoACK>0) )
         % they are not necessarily shifts of the buffer estimate in Xh
         
         % SENT control command for step t
-        ut = E1*Uin;
+        ut = E*USent;
         
         dU = zeros(1,tNoACK);
         for i = 1:tNoACK
@@ -32,17 +49,17 @@ if( covPriorAdj && (tNoACK>0) )
         Pstar = zeros(1,10);
         if(tNoACK==1)
             
-            Pstar(1) = (-ab*(ab-1))*dU(:,1);
+            Pstar(1) = (-alpha_cBar*(alpha_cBar-1))*dU(:,1);
             %Pstar2 = 0;
-            fprintf('\nt=%d, KF tp=%d, Pstar1 = %f \n',t, tp, Pstar(1))
+            fprintf('\nt=%d, KF tKF=%d, Pstar1 = %f \n',t, tKF, Pstar(1))
             
         elseif(tNoACK==2)
             
             % uses diff with 1-step prev. plan
-            Pstar(1) = (- ab^4 + 2*ab^3 - 2*ab^2 + ab)*dU(:,2)^2;
+            Pstar(1) = (- alpha_cBar^4 + 2*alpha_cBar^3 - 2*alpha_cBar^2 + alpha_cBar)*dU(:,2)^2;
             % uses diff with 2-step prev. plan (earliest)
-            Pstar(2) = (- ab^4 + 4*ab^3 - 5*ab^2 + 2*ab)*dU(:,1)^2;
-            fprintf('\nt=%d, KF tp=%d, Pstar1 = %f, Pstar2 = %f \n',t,tp,Pstar(1),Pstar(2))
+            Pstar(2) = (- alpha_cBar^4 + 4*alpha_cBar^3 - 5*alpha_cBar^2 + 2*alpha_cBar)*dU(:,1)^2;
+            fprintf('\nt=%d, KF tKF=%d, Pstar1 = %f, Pstar2 = %f \n',t,tKF,Pstar(1),Pstar(2))
 
         elseif(tNoACK>2)
             
@@ -79,14 +96,14 @@ else
 end
 
 % Kalman gain = fcn of Ppre
-L = ((Ppre*C')/(C*Ppre*C'+V))*S;   % L_{t}
+L = ((Ppre*C')/(C*Ppre*C'+V))*D_m;   % L_{t}
 P = Ppre - L*(C*Ppre);
 
 % propagate system
 I = eye(size(A));
-AAHat = [(I-L*C)*A,(I-L*C)*Bu*E1*M*(eye(Np*Nu*Nv)-Dh);...
-    zeros(Nv*Np*Nu,Nx),M*(eye(Np*Nu*Nv)-Dh)];
-BUHat = [(I-L*C)*Bu*E1*Dh;Dh];
-Xh = AAHat*Xh + BUHat*Uin+[L;zeros(Np*Nu*Nv,size(y,1))]*y;
+AAHat = [(I-L*C)*A,(I-L*C)*Bu*E*M*(eye(Np*Nu*Nv)-D_cHat);...
+    zeros(Nv*Np*Nu,Nx),M*(eye(Np*Nu*Nv)-D_cHat)];
+BUHat = [(I-L*C)*Bu*E*D_cHat;D_cHat];
+XHat = AAHat*XHat + BUHat*USent+[L;zeros(Np*Nu*Nv,size(yKF,1))]*yKF;
 
 end
