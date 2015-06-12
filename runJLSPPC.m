@@ -50,7 +50,7 @@ nACKHistory = 5;
 % delays
 tm = 1; % meas delay
 tc = 1; % control delay
-ta = 2; % ACK delay
+ta = 3; % ACK delay
 
 % packet success probabilities
 alphaBar = .5; % controls

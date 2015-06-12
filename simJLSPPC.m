@@ -19,8 +19,6 @@ printDebug = 1;
 if(covPriorAdj)
     disp('COV PRIOR ADJUST ON')
 end
-% (think about/fix bug if ta>tm... is tNoACK computed and used in KF
-% correctly?)
 
 % initialization stuff
 Nx = size(A,1);
@@ -115,13 +113,14 @@ for t = (tm+1):(Ns-1)
     % also increments a lookahead of tNoACK(t-ta+1 --> future)
     [Dh,alphaHat,a,KFstart,gotACK,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphaHat,...
         Lambda,gamma,t,tm,tc,ta,tap,Nu,Np,tNoACK,nACKHistory,printDebug);
+    
     if(printDebug)
         disp(tNoACK)
     end
     
-    %%%%%%%
+    %%%%%%%%%%%%%%%
     % run estimator
-    %%%%%%%
+    %%%%%%%%%%%%%%%
     
     % compute buffer and control action if all control packets through
     if( (t-tm-1) >= 1)
@@ -141,16 +140,7 @@ for t = (tm+1):(Ns-1)
         if(covPriorAdj)
             
             % determine appropriate tNoACK for specific filter step
-            % td is the a posteriori estimate time
-            % ACK relates to control action needed for prior (td-1)
-            % relevant tNoACK = 
             tNoACK_KF = zeros(Nv);
-            
-            % we know tNoACK(t-ta)=0 if ACK Rx'd at t
-            %tDiff = t-td;
-            % when tDiff = ta, tNoACK is zero (t-ta)
-            % 
-            
             for i = 1:Nv
                 if(td-1-tap(i)>0)
                     tNoACK_KF(i) = tNoACK(i,td+tap(i)-1);
@@ -176,9 +166,12 @@ for t = (tm+1):(Ns-1)
                 end
                 UOptions(:,k) = E1*M^k*bTMP;
             end
+            
         else
+            
             UOptions = [];
             tNoACK_KF = [];
+            
         end
         
         if(td<=1)
@@ -187,8 +180,8 @@ for t = (tm+1):(Ns-1)
             XhIn = [xHat1;zeros(Nu*Np*Nv,1)];
             Pin = P1;
             Uin = zeros(Nu*Np*Nv,1);
-            yIn = yh(:,td);
-            SIn = S(:,:,td);
+            yIn = yh(:,1);
+            SIn = S(:,:,1);
         else
             AKF = A;
             DKFh = Dh(:,:,td-1);
@@ -231,7 +224,7 @@ for t = (tm+1):(Ns-1)
         % starts with Xh: xHat_{t-tm|t-tm}, bHat_{t-tm-1}
         % compute xHatMPC_{t-tm+1:t+tc|t-tm}, bHatMPC_{t-tm:t+tc-1}
         % first step: uses uHat_{t-tm} <-- Dh(:,:,t-tm)
-        % *NOTE* Goal of XhMPC(:,end,:) is to match true X(:,:)
+        % *DEBUG NOTE* Goal of XhMPC(:,end,:) is to match true X(:,:)
         
         Ufwd = U(:,(t-tm):(t+tc-1));
         Dfwd = Dh(:,:,(t-tm):(t+tc-1));

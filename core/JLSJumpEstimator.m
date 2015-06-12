@@ -52,9 +52,7 @@ else
     aInds = find(diag(a(:,:,t-ta)));
 end
 
-
-% if useful ACK has arrived, update Dhat
-% using alphaHat (alpha as known at estimator)
+% use ACK information to update Dhat and alphaHat
 
 % check at start - don't reference negative times
 % slight hack, more precise check would individual channels... 
@@ -98,6 +96,7 @@ if( ~isempty(aInds) && checkStart )
     if(printDebug)
        fprintf('\nt=%d, JE t-tm=%d, backupStart+1=%d\n',t,t-tm,backupStart+1) 
     end
+    
 else
     
     KFstart = t - tm;   % usual 1-step update
@@ -110,33 +109,26 @@ for i = 1:length(aInds)
     gotACK(aInds(i)) = 1;
     if(printDebug)
         fprintf('\nt=%d, JE GOT ACK, channel %d \n',t,i)
-        % only going to backup if got ACK...
     end
 end
 
-% increment true tNoACK (into the future)
+% increment tNoACK (plus lookahead)
 if( (t-ta-1)>0 )
-    
-    % depending on delays, schedule of ACKs vs. measurements, the KF may
-    % run further ahead than the ACKs have been updated for
-    % rather than implement a separate counter inside KF, we fill in a
-    % limited lookahead of tNoACK increments 
-    lookahead = 10;
-    
     % (once this works, modify for multivar)
     
+    nL = 10;
+    
     % some checks for the end of the mission 
-    if(t-ta+lookahead>length(tNoACK))
+    if(t-ta+nL>length(tNoACK))
         maxadd = length(tNoACK);
     else
-        maxadd = t-ta+lookahead;
+        maxadd = t-ta+nL;
     end
-    startVal = tNoACK(:,t-ta-1);
-    %newVec = ones(1,maxadd - (t-ta)+1);
-    %newVec1 = 0:(maxadd - (t-ta));
-    newVec1 = 1:(maxadd-(t-ta)+1);
+    lookahead = 1:(maxadd-(t-ta));
+    
     % increment future starting from current value
-    tNoACK(:,(t-ta):maxadd)  =  newVec1 + startVal;
+    %startVal = tNoACK(:,t-ta-1);
+    %tNoACK(:,(t-ta):maxadd)  =  lookahead + startVal;
     
     % update tNoACK based on new ACKs this step (t-ta)
     for i = 1:nACKs
@@ -151,9 +143,13 @@ if( (t-ta-1)>0 )
             tNoACK(i,tBackup:t-ta) = 0;
             
             % increment future, starting at 1
-            newVec2 = 1:(maxadd - (t-ta));
-            tNoACK(i,(t-ta+1):maxadd) = newVec2;
+            tNoACK(i,(t-ta+1):maxadd) = lookahead;
                         
+        else
+            
+            startVal = tNoACK(i,t-ta-1);
+            tNoACK(i,(t-ta):maxadd-1) = startVal + lookahead;
+            
         end
     end
 end
