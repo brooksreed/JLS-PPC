@@ -42,6 +42,16 @@ if(strfind(sched,'SISO2'))
     end
 end
 
+if(strfind(sched,'SISO2ALLCONTROL'))
+    Ts = 2;
+    piBase = [1 1];
+    xiBase = [0 1];
+    if(strfind(sched,'piggyback'))
+        lambdaBase = xiBase;
+    elseif(strfind(sched,'noACK'))
+        lambdaBase = [0 0];
+    end
+end
 
 if(strfind(sched,'SISO4'))
     Ts = 4;
@@ -157,7 +167,12 @@ if(isempty(strfind(sched,'noACK')))
         if(piPos>lambdaPos)
             lambdaPos = lambdaPos + Ts;
         end
-        tap(i) = lambdaPos - piPos;
+        try
+            tap(i) = lambdaPos - piPos;
+        catch
+            % (SISO2ALLCONTROL -- fix eventually)
+            tap(i) = 0;
+        end
     end
 end
 

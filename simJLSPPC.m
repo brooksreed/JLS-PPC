@@ -1,18 +1,21 @@
 function [results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tap,...
     alphaBar,Pi,Xi,Lambda,umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,...
-    w,v,alpha,beta,gamma,nACKHistory)
+    w,v,alpha,beta,gamma,covPriorAdj,nACKHistory)
 % runs simulation of MJLS/scheduled PPC
 
 % currently restricts to time-invariant constraint input
 % (code in the sim converts to fcn of time)
 
+% FIX/UPDATE NOTATION
+% CLEAN UP PRINTOUTS, NOTE WHERE SINGLE CHANNEL ONLY
+
+
 % BR, 4/23/2014
 % modifying for delayed ACKs, 6/13/2014
 
-printouts = 0;
+printDebug = 1;
 
 % currently always uses alphaBar state prior adjustment
-covPriorAdj = 0;
 if(covPriorAdj)
     disp('COV PRIOR ADJUST ON')
 end
@@ -26,8 +29,9 @@ Nw = size(Bw,2);
 NY = size(C,1);
 Ny = NY/Nv;
 
-% initially no steps since dropped ACK
-tNoACK = zeros(Nv,1);
+% initialize tNoACK to zeros (no ACK for 'step 0')
+tNoACK = zeros(Nv,Ns);
+tNoACK(:,1) = ones(Nv,1);
 
 Umax = repmat(umax,1,Ns+Np);
 Umin = repmat(umin,1,Ns+Np);
@@ -53,9 +57,9 @@ U = zeros(Nu*Np*Nv,Ns);
 % initialize Dhat and Dyes
 Dh = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns+tc);   % D hat for estimator
 Ds = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns+tc);   % used to track utilde for cov. prior
-alphat = repmat(alphaBar,[1 Ns]);
+alphaHat = repmat(alphaBar,[1 Ns]);
 for t = (tc+1):Ns
-    Dh(:,:,t) = makeD(Pi(:,t-tc),alphat(:,t-tc),Nu,Np);
+    Dh(:,:,t) = makeD(Pi(:,t-tc),alphaHat(:,t-tc),Nu,Np);
     Ds(:,:,t) = makeD(Pi(:,t-tc),Pi(:,t-tc),Nu,Np);
 end
 
@@ -64,7 +68,7 @@ S = zeros(Nv*Ny,Nv*Ny,Ns);
 a = zeros(Nv,Nv,Ns);
 
 utilde = zeros(NU,Ns);
-bYes = zeros(Nu*Np*Nv,1);
+bYes = zeros(Nu*Np*Nv,Ns);
 
 XhMPC = NaN*zeros(Nv*Np*Nu+Nx,tm+tc+1,Ns);	% includes xHatMPC and bHatMPC
 Jcomp = NaN*zeros(1,Ns);
@@ -93,45 +97,115 @@ for t = (tm+1):(Ns-1)
     % at step t, meas. are sent at t-tm
     S(:,:,t-tm) = makeS(Xi(:,t-tm),beta(:,t-tm),Ny);
     yh(:,t-tm) = S(:,:,t-tm)*y(:,t-tm);     % available tm steps after sent
-
+    
+    if(printDebug)
+        fprintf('\n~~~STEP t=%d AT ESTIMATOR~~~\n',t)
+        % (do for multi-channel eventually)
+        if(S(:,:,t-tm)==1)
+            fprintf('\nt=%d, t-%d Meas RX success\n',t,tm)
+        end
+    end
+    
     % determine ACKs available at this step
-    % update Dh (and alphat), and KFstart
-    [Dh,alphat,a,KFstart,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,...
-        Lambda,gamma,t,tm,tc,ta,tap,Nu,Np,tNoACK,nACKHistory);    
+    % update Dh (and alphaHat), KFstart
+    % uses tNoACK(t-ta-1) to determine how far back to update
+    % updates tNoACK(t-ta) and history based on ACKs RX'd now
+    % also increments a lookahead of tNoACK(t-ta+1 --> future)
+    [Dh,alphaHat,a,KFstart,gotACK,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphaHat,...
+        Lambda,gamma,t,tm,tc,ta,tap,Nu,Np,tNoACK,nACKHistory,printDebug);
     
-    %%%%%%%
+    if(printDebug)
+        disp(tNoACK)
+    end
+    
+    %%%%%%%%%%%%%%%
     % run estimator
-    %%%%%%%
+    %%%%%%%%%%%%%%%
     
-    % first compute utilde (control if packets all successful)
+    % compute buffer and control action if all control packets through
     if( (t-tm-1) >= 1)
-        bYes = M*(eye(Np*Nu*Nv)-Ds(:,:,t-tm-1))*bYes + ...
+        if(t-tm-1>1)
+            bPrev = bYes(:,t-tm-2);
+        else
+            bPrev = zeros(Nu*Np*Nv,1);
+        end
+        bYes(:,t-tm-1) = M*(eye(Np*Nu*Nv)-Ds(:,:,t-tm-1))*bPrev + ...
             Ds(:,:,t-tm-1)*U(:,t-tm-1);
-        utilde(:,t-tm-1) = E1*bYes;
+        utilde(:,t-tm-1) = E1*bYes(:,t-tm-1);
     end
     
     % run KF from KFstart up until time of recent measurement
     for td = KFstart:(t-tm)
+        
+        if(covPriorAdj)
+            
+            % determine appropriate tNoACK for specific filter step
+            tNoACK_KF = zeros(Nv);
+            for i = 1:Nv
+                if(td-1-tap(i)>0)
+                    tNoACK_KF(i) = tNoACK(i,td+tap(i)-1);
+                end
+            end
+            
+            % constrain to ACK history length if needed
+            if(tNoACK_KF>nACKHistory)
+                tNoACK_KF = nACKHistory;
+                if(printDebug)
+                    disp('truncating ACK history')
+                end
+            end
+            
+            % prepare control options for use in cov. prior adj.
+            % (fix this later for multivar.)
+            UOptions = zeros(NU,tNoACK_KF);
+            for k = 1:tNoACK_KF
+                if(td-k<1)
+                    bTMP = zeros(Nu*Np*Nv,1);
+                else
+                    bTMP = bYes(:,td-k);
+                end
+                UOptions(:,k) = E1*M^k*bTMP;
+            end
+            
+        else
+            
+            UOptions = [];
+            tNoACK_KF = [];
+            
+        end
+        
         if(td<=1)
             AKF = eye(size(A));
             DKFh = makeD(zeros(Nv,1),zeros(Nv,1),Nu,Np);
             XhIn = [xHat1;zeros(Nu*Np*Nv,1)];
             Pin = P1;
             Uin = zeros(Nu*Np*Nv,1);
-            ut = zeros(NU,1);
+            yIn = yh(:,1);
+            SIn = S(:,:,1);
         else
             AKF = A;
             DKFh = Dh(:,:,td-1);
             XhIn = Xh(:,td-1);
             Pin = P(:,:,td-1);
             Uin = U(:,td-1);
-            ut = utilde(:,td-1);
+            yIn = yh(:,td);
+            SIn = S(:,:,td);
         end
         
         % Xh(:,t-tm): xHat_{t-tm|t-tm},bHat_{t-tm-1}
-        [Xh(:,td),P(:,:,td)] = JLSKF(XhIn,Pin,yh(:,td),Uin,DKFh,...
-            Nx,Nv,Nu,Np,S(:,:,td),AKF,Bu,E1,M,C,W,V,...
-            ut,alphaBar,covPriorAdj);
+        [Xh(:,td),P(:,:,td)] = JLSKF(XhIn,Pin,yIn,Uin,DKFh,...
+            Nx,Nv,Nu,Np,SIn,AKF,Bu,E1,M,C,W,V,...
+            UOptions,alphaBar,covPriorAdj,tNoACK_KF,t,td);
+        
+        if(printDebug)
+            if(Nv==1)
+                fprintf('\nt=%d, KF td=%d, tNoACK_KF(%d)=%d\n',t,td,td+tap(1)-1,tNoACK_KF)
+            end
+            if(size(A,1)==1)
+                % only print estimate for scalar sys
+                fprintf('Xh(:,1:%d)=\n',td);disp(Xh(:,1:td)')
+            end
+        end
         
     end
     
@@ -150,7 +224,7 @@ for t = (tm+1):(Ns-1)
         % starts with Xh: xHat_{t-tm|t-tm}, bHat_{t-tm-1}
         % compute xHatMPC_{t-tm+1:t+tc|t-tm}, bHatMPC_{t-tm:t+tc-1}
         % first step: uses uHat_{t-tm} <-- Dh(:,:,t-tm)
-        % *NOTE* Goal of XhMPC(:,end,:) is to match true X(:,:) 
+        % *DEBUG NOTE* Goal of XhMPC(:,end,:) is to match true X(:,:)
         
         Ufwd = U(:,(t-tm):(t+tc-1));
         Dfwd = Dh(:,:,(t-tm):(t+tc-1));
@@ -169,7 +243,7 @@ for t = (tm+1):(Ns-1)
             
             if(strfind(status,'Solved'))
                 solveStatus=1;
-                fprintf('\nStep %d: %s\n',t,status)
+                fprintf('\nt=%d, MPC: %s\n',t,status)
                 
             elseif( strcmp(status,'Failed') )
                 disp('FAILED')
@@ -234,13 +308,13 @@ for t = (tm+1):(Ns-1)
     looptime(t) = toc(looptic);
     
     %%%%%%%
-    if( (t>3) && printouts)
-        try
-            printoutsJLSPPC
-        catch
-            disp('printout error')
-        end
-    end
+    %     if( (t>3) && printouts)
+    %         try
+    %             printoutsJLSPPC
+    %         catch
+    %             disp('printout error')
+    %         end
+    %     end
     
 end
 
@@ -256,17 +330,23 @@ Jsim = jj + xF'*Q*xF;
 
 results.X = X;
 results.u = u;
-results.utilde = utilde;
-results.Xh = Xh;
-results.Jsim = Jsim/Ns;
 results.U = U;
+
+results.utilde = utilde;
+results.bYes = bYes;
+results.tNoACK = tNoACK;
+
+results.Xh = Xh;
 results.P = P;
+
 results.XhMPC = XhMPC;
 results.Jcomp = Jcomp;
 results.XPlan = XPlan;
 results.MPCtime = MPCtime;
-results.looptime = looptime;
 results.MPCFail = MPCFail;
+
+results.looptime = looptime;
+results.Jsim = Jsim/Ns;
 results.rmsEstError = nanrms(X(1:Nv,:) - Xh(1:Nv,:),2);
 results.rmsPosError = nanrms(X(1,:),2);
 

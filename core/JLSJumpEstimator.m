@@ -1,7 +1,7 @@
-function [Dh,alphat,a,KFstart,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,...
-    Lambda,gamma,t,tm,tc,ta,tap,Nu,Np,tNoACK,nACKHistory)
+function [Dh,alphaHat,a,KFstart,gotACK,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphaHat,...
+    Lambda,gamma,t,tm,tc,ta,tap,Nu,Np,tNoACK,nACKHistory,printDebug)
 % Jump estimator and prep for (lossy,delayed) KF
-% [Dh,alphat,a,KFstart] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,...
+% [Dh,alphaHat,a,KFstart] = JLSJumpEstimator(Dh,Pi,a,alpha,alphaHat,...
 %    Lambda,gamma,t,tm,tc,ta,tap,Nu,Np)
 % Updates Dh based on delayed ACKs
 % (If no ACK, Dh is left as input -- currently uses alphaBar)
@@ -17,42 +17,55 @@ function [Dh,alphat,a,KFstart,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphat,..
 
 % initial approach - clarity over efficiency
 % refactor later?
+% update help @ top...
 
-printDebug = 1;
+nACKs = size(tNoACK,1);
 
-tNoACK  = tNoACK+1; % always increment 1 step at beginning
-if(printDebug)
-    fprintf('\ntNoACK=%d\n',tNoACK)
+% Algorithm will back up as far as it can towards the most recent time of
+% an ACK, using ACK histories.  
+% It does not back up extra far (does not use all ACK history if not
+% needed).  
+
+% tNoACK counter is updated with a "lag" of ta
+% tNoACK(t-ta) resets to zero if ACK received at time t 
+
+% Algorithm uses previous step counter when figuring out how far to back up
+% tNoACK for step t-ta-1 used by algorithm
+if(t-ta-1>0)
+    tNoACKAlg = tNoACK(:,t-ta-1);
+else
+    tNoACKAlg = zeros(nACKs);
 end
-
 % limit "lookback" to the length of the ACK history sent
-for i = 1:length(tNoACK)
-    if(tNoACK(i) > nACKHistory)
-        tNoACK(i) = nACKHistory;
-        if(printDebug)
-            fprintf('\n Step %d WARNING: #dropped ACKs > ACK history\n',t)
-        end
+for i = 1:nACKs
+    if(tNoACKAlg(i) > nACKHistory)
+        tNoACKAlg(i) = nACKHistory;
     end
 end
 
 % determine ACKs available at this step
 % at step t, ACKs are sent at t-ta
-a(:,:,t-ta) = diag(Lambda(:,t-ta).*gamma(:,t-ta));
-aInds = find(diag(a(:,:,t-ta)));
-
-% check at startup - ack referencing negative time
-if(~isempty(aInds))
-    initTimes = tNoACK(aInds);
+if(t-ta<1)
+    aInds = [];
+else
+    a(:,:,t-ta) = diag(Lambda(:,t-ta).*gamma(:,t-ta));
+    aInds = find(diag(a(:,:,t-ta)));
 end
 
-% run through algorithm if useful ACK has arrived
-if( ~isempty(aInds) && (t-ta-(max(initTimes)))>1 )
+% use ACK information to update Dhat and alphaHat
+
+% check at start - don't reference negative times
+% slight hack, more precise check would individual channels... 
+checkStart = (t-ta-max(tap)>tc);
+if( ~isempty(aInds) && checkStart )
     
     % for each ACK channel
     min_tACK = zeros(size(aInds));max_tACK=min_tACK;
+    tACK = cell(1,length(aInds));
     for i = aInds
         % find time range for new ACKs
-        tACK{i} = t-ta-tap(i)-tNoACK(i):t-ta-tap(i);
+        % (furthest back in time ACK history will be useful)
+        tACK{i} = t-ta-tap(i)-tNoACKAlg(i):t-ta-tap(i);
         tACK{i} = tACK{i}(tACK{i}>tc);
         min_tACK(i) = min(tACK{i});
         max_tACK(i) = max(tACK{i});
@@ -62,8 +75,8 @@ if( ~isempty(aInds) && (t-ta-(max(initTimes)))>1 )
     for i = aInds
         % run fwd incorporating new ACKs
         for tprime = tACK{i}
-            % update specific alphat's
-            alphat(i,tprime-tc) = alpha(i,tprime-tc);
+            % update specific alphaHat's
+            alphaHat(i,tprime-tc) = alpha(i,tprime-tc);
         end
     end
     
@@ -73,12 +86,16 @@ if( ~isempty(aInds) && (t-ta-(max(initTimes)))>1 )
     
     % update Dhat using alphahat
     for tprime = backupStart:backupEnd
-        Dh(:,:,tprime) = makeD(Pi(:,tprime-tc),alphat(:,tprime-tc),...
+        Dh(:,:,tprime) = makeD(Pi(:,tprime-tc),alphaHat(:,tprime-tc),...
             Nu,Np);
     end
     
-    % if ACKs, KF start goes back to oldest useful (eg new) ACK
-    KFstart = min((t-tm),backupStart);
+    % KFstart is the oldest (a posteriori) step of backup-rerun
+    % KFstart uses the oldest updated Dhat(backupStart)
+    KFstart = min((t-tm),(backupStart+1));
+    if(printDebug)
+       fprintf('\nt=%d, JE t-tm=%d, backupStart+1=%d\n',t,t-tm,backupStart+1) 
+    end
     
 else
     
@@ -86,10 +103,72 @@ else
     
 end
 
-% reset ACK counter to zero for ACK channels received
+% update gotACK flag for each channel for KF to use
+gotACK = zeros(size(a,3));
 for i = 1:length(aInds)
-    tNoACK(aInds(i)) = 0; 
+    gotACK(aInds(i)) = 1;
     if(printDebug)
-        fprintf('\n Step %d GOT ACK\n',t)
+        fprintf('\nt=%d, JE GOT ACK, channel %d \n',t,i)
     end
 end
+
+% increment tNoACK (plus lookahead)
+if( (t-ta-1)>0 )
+    % (once this works, modify for multivar)
+    
+    nL = 10;
+    
+    % some checks for the end of the mission 
+    if(t-ta+nL>length(tNoACK))
+        maxadd = length(tNoACK);
+    else
+        maxadd = t-ta+nL;
+    end
+    lookahead = 1:(maxadd-(t-ta));
+    
+    % increment future starting from current value
+    %startVal = tNoACK(:,t-ta-1);
+    %tNoACK(:,(t-ta):maxadd)  =  lookahead + startVal;
+    
+    % update tNoACK based on new ACKs this step (t-ta)
+    for i = 1:nACKs
+        if(gotACK(i))
+            tNoACK(i,t-ta) = 0;
+            
+            % zero past counters based on history
+            tBackup = t-nACKHistory-ta;
+            if(tBackup<1)
+                tBackup = 1;
+            end
+            tNoACK(i,tBackup:t-ta) = 0;
+            
+            % increment future, starting at 1
+            tNoACK(i,(t-ta+1):maxadd) = lookahead;
+                        
+        else
+            
+            startVal = tNoACK(i,t-ta-1);
+            tNoACK(i,(t-ta):maxadd-1) = startVal + lookahead;
+            
+        end
+    end
+end
+
+if(printDebug && (t-ta>1) )
+    for i = 1:nACKs
+        fprintf('\nt=%d, JE tNoACK(t-ta)=%d, tNoACK(t)=%d\n',t,tNoACK(t-ta),tNoACK(i,t))
+    end
+    if(exist('backupStart','var'))
+        fprintf('    JE furthest back posterior estimate: t=%d\n',backupStart)
+    end
+end
+
+if(printDebug)
+    for i = 1:nACKs
+        if(tNoACK(i) > nACKHistory)
+            fprintf('\nt=%d, JE WARNING: #dropped ACKs > ACK history, channel %d \n',t,i)
+        end
+    end
+end
+
+

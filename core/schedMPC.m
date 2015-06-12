@@ -74,8 +74,12 @@ blockR = kron(eye(Np),R);
 
 cvx_clear
 cvx_begin 
-cvx_solver gurobi
-%cvx_solver sedumi
+try
+    % first choice not installed with CVX
+    cvx_solver gurobi
+catch 
+    cvx_solver sedumi
+end
 cvx_quiet(true)
 
 if(stateConstraints)

@@ -16,6 +16,9 @@ clc
 % SYSTEM DEFINITION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%sys = 'DoubleIntegrator';
+sys = 'SISO';
+
 % schedule
 
 % 'SISO_' options for _piggyback or _noACK:
@@ -27,12 +30,17 @@ clc
 %sched = 'SISO4_piggyback';
 %sched = 'SISO4_noACK';
 %sched = 'SISO2_noACK';
-sched = 'SISO2_piggyback';
-%sched = 'SISOALL_piggyback';
+%sched = 'SISO2_piggyback';
+
+
+%sched = 'SISO2ALLCONTROL_noACK';
+%sched = 'SISO2ALLCONTROL_piggyback';
+sched = 'SISOALL_piggyback';
+%sched = 'SISOALL_noACK';
 
 % # ACK Histories sent (makes most sense to be multiple of schedule length)
 % For 'SINGLE ACK': set nACKHistory = Ts (schedule length)
-nACKHistory = 6;
+nACKHistory = 5;
 
 % NOTE:
 % With very long ACK history, a posteriori estimate should have no effects
@@ -42,59 +50,93 @@ nACKHistory = 6;
 % delays
 tm = 1; % meas delay
 tc = 1; % control delay
-ta = 1; % ACK delay
+ta = 3; % ACK delay
 
 % packet success probabilities
-alphaBar = .8; % controls
-betaBar = .8;  % measurements
-gammaBar = .8; % ACKs (if piggyback used, betaBar overrides gammaBar)
+alphaBar = .5; % controls
+betaBar = 1;  % measurements
+gammaBar = 1; % ACKs (if piggyback used, betaBar overrides gammaBar)
+covPriorAdj = 1;
 
 %%%%%%%%%%%%%%%%%%
 
-Ns = 100; % sim length
-NpMult = 5; % the MPC horizon Np = Ts*NpMult 
+Ns = 20; % sim length
+NpMult = 4; % the MPC horizon Np = Ts*NpMult 
 Nv = 1;   % # vehicles (comms channels)
 
-% Double Integrator
-A =[1,1;0,1];
-Bu = [0.5;1];
-Bw = Bu;
-C = [1 0];      % position output
-%C = eye(2);    % full state output
+switch sys
+    case 'DoubleIntegrator'
+        
+        % Double Integrator
+        A =[1,1;0,1];
+        Bu = [0.5;1];
+        Bw = Bu;
+        C = [1 0];      % position output
+        %C = eye(2);    % full state output
 
-Q = [10,0;0,1];
-Qf = 10*Q;
-R = 1;
-umax = 10;
-umin = -10;
-Xmax = [];Xmin = [];
-nLevels = 15;   % quantization levels
-codebook = linspace(umin,umax,nLevels);
+        Q = [10,0;0,1];
+        Qf = 10*Q;
+        R = 1;
+        umax = 10;
+        umin = -10;
+        Xmax = [];Xmin = [];
+        nLevels = 15;   % quantization levels
+        codebook = linspace(umin,umax,nLevels);
 
-% process/measurement noise
-W = .1;
-V = .1;%4;
-% W = 1;
-% V = .1;
+        % process/measurement noise
+        W = 1;
+        V = 1;%4;
+        % W = 1;
+        % V = .1;
+        
+        % cov... uncertain position but better-known velocity (closer to zero)
+        P1 = [25,0;0,9];     
+
+    case 'SISO'
+        
+        % Scalar integrator
+        A =1;
+        Bu = 1;
+        Bw = Bu;
+        C = 1;      % position output
+
+        Q = 10;
+        Qf = 10*Q;
+        R = 1;
+        umax = 1;
+        umin = -1;
+        Xmax = [];Xmin = [];
+        nLevels = 33;   % quantization levels
+        codebook = linspace(umin,umax,nLevels);
+
+        % process/measurement noise
+        W = 1;
+        V = 1;%4;
+        % W = 1;
+        % V = .1;
+        
+        P1 = 9;
+        
+end
 
 % estimation init
-xHat1 = zeros(2,1);
-% cov... uncertain position but better-known velocity (closer to zero)
-P1 = [25,0;0,9];     
+xHat1 = zeros(size(A,1),1);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SYSTEM INIT/SETUP
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+xIC = 5*randn(size(A,1),1);
 
-xIC = 5*randn(2,1);
-% position only, no initial velocity (so like step resp from rest)
-xIC(2)=0;xIC(1)=5;
+if(strcmp(sys,'DoubleIntegrator'))
+    % position only, no initial velocity (so like step resp from rest)
+    xIC(2)=0;xIC(1)=5;
+end
 
 % (IF WANT TO DEBUG CONTROLLER - INIT ESTIMATOR PERFECTLY)
 % xHat1 = xIC;P1 = 1*eye(2);
 
-w = sqrt(W)*randn(1,Ns);
-v = sqrt(V)*randn(1,Ns);
+w = sqrt(W)*randn(size(Bw,1),Ns);
+v = sqrt(V)*randn(size(C,1),Ns);
 
 % packet loss sequences
 beta = zeros(Nv,Ns);alpha = zeros(Nv,Ns);gamma = zeros(Nv,Ns);
@@ -104,6 +146,9 @@ for k = 1:Ns
     gamma(:,k) = (sign(rand(Nv,1) - (1-(gammaBar)))*0.5 + 0.5);
 end
 
+%alpha(:,1:11) = [1 1 0 0 1 1 0 1 0 0 1];
+beta(:,1:11) =  [1 1 1 1 0 0 1 1 1 1 1];
+
 [Pi,Xi,Lambda,tap,Ts] = createSchedule(sched,Nv,Ns,tc);
 
 if(strfind(sched,'piggyback'))
@@ -112,9 +157,11 @@ if(strfind(sched,'piggyback'))
 end
 Np = NpMult*Ts;
 
+%% call sim fcn
+
 [r] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tap,...
     alphaBar,Pi,Xi,Lambda,umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,...
-    w,v,alpha,beta,gamma,nACKHistory);
+    w,v,alpha,beta,gamma,covPriorAdj,nACKHistory);
 
 % convenient if want to save:
 r.P1 = P1;
@@ -134,7 +181,12 @@ r.Lambda = Lambda;
 
 %% plots (for SISO systems)
 
-CPlot = [1 0];  % output for plotting
+if(size(A,1)==2)
+    CPlot = [1 0];  % output for plotting
+else
+    CPlot = 1;
+end
+
 plotXhMPC = 1;  % plots prediction used for computing control
 plotLosses = 1; % plots packet losses for c, m (no a right now)
 
@@ -175,10 +227,17 @@ else
     legend([hx hxh hc hb],'X','XHat','c loss','m loss')
 end
 
-
 subplot(3,1,3)
 stairs(0:Ns-1,r.u,'k')
 hold on
-stairs(0:Ns-1,r.w,'b:')
-legend('u','w')
+stairs(0:Ns-1,r.utilde,'b:')
+legend('u true','u planned')
+%stairs(0:Ns-1,r.w,'b:')
+%legend('u','w')
 xlabel('time step')
+
+if(size(r.P,1)==1)
+    figure
+    plot(squeeze(r.P))
+end
+
