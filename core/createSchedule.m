@@ -16,7 +16,9 @@ function [Pi_c,Pi_m,Pi_a,tac,Ts] = createSchedule(sched,Nv,Ns,tc)
 % 'tac' = Nv x 1 vector of time between planned control RX and ACK TX
 
 % BR, 4/23/2014
+% v1.0 6/13/2015
 
+% TO DO: 
 % lots of hardcoding...  make more modular?
 
 if(strfind(sched,'SISOALL'))

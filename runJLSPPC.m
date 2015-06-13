@@ -1,6 +1,15 @@
 % Script to run a simple simulation of JLS-PPC
 % BR, 5/27/2015
 
+% v1.0 6/13/2015
+
+% TO DO: 
+% clean up/separate inputs vs. other? 
+% one toggle for 'debugging mode'?
+% better plots
+% automated saving/logging?
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % double integrator system
 % a few options for schedules
 % handles varying lengths of ACK histories

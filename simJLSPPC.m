@@ -6,12 +6,14 @@ function [results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tac,...
 % currently restricts to time-invariant constraint input
 % (code in the sim converts to fcn of time)
 
-% FIX/UPDATE NOTATION
-% CLEAN UP PRINTOUTS, NOTE WHERE SINGLE CHANNEL ONLY
-
-
 % BR, 4/23/2014
 % modifying for delayed ACKs, 6/13/2014
+% v1.0 6/13/2015
+
+% TO DO: 
+% Clean up printouts? 
+% Make sure prep for KF is ready for MIMO and multiple P*s
+% Add more automated tests/checks?
 
 printDebug = 1;
 
@@ -56,11 +58,11 @@ U = zeros(Nu*Np*Nv,Ns);
 
 % initialize Dhat and Dyes
 D_cHat = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns+tc);   % D hat for estimator
-DcNoLoss = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns+tc);   % used to track utilde for cov. prior
+D_cNoLoss = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns+tc);   % used to track utilde for cov. prior
 alphaHat = repmat(alpha_cBar,[1 Ns]);
 for t = (tc+1):Ns
     D_cHat(:,:,t) = makeD_c(Pi_c(:,t-tc),alphaHat(:,t-tc),Nu,Np);
-    DcNoLoss(:,:,t) = makeD_c(Pi_c(:,t-tc),Pi_c(:,t-tc),Nu,Np);
+    D_cNoLoss(:,:,t) = makeD_c(Pi_c(:,t-tc),Pi_c(:,t-tc),Nu,Np);
 end
 
 D_c = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns);    % true D
@@ -131,8 +133,8 @@ for t = (tm+1):(Ns-1)
         else
             bPrev = zeros(Nu*Np*Nv,1);
         end
-        bNoLoss(:,t-tm-1) = M*(eye(Np*Nu*Nv)-DcNoLoss(:,:,t-tm-1))*bPrev + ...
-            DcNoLoss(:,:,t-tm-1)*U(:,t-tm-1);
+        bNoLoss(:,t-tm-1) = M*(eye(Np*Nu*Nv)-D_cNoLoss(:,:,t-tm-1))*bPrev + ...
+            D_cNoLoss(:,:,t-tm-1)*U(:,t-tm-1);
         uNoLoss(:,t-tm-1) = E*bNoLoss(:,t-tm-1);
     end
     

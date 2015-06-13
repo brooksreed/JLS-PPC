@@ -20,11 +20,16 @@ function [U,cost,status,XOut,violateSlack] = schedMPC(xIn,...
 % XOut output gives predicted state trajectory
 
 % BR, 4/29/2014
-
 %{
 - 4/30/2014: added saturation on control priors (rounding error)
 - 8/17/2014: added uDB (deadband on control actions) -- symmetric
 %}
+
+% v1.0 6/13/2015
+
+% TO DO: 
+% try-catch for cvx solver slow on startup?
+% [try a faster solver?]
 
 if(nargin<15)
     uDB = [];
