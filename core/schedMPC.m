@@ -1,8 +1,8 @@
 function [U,cost,status,XOut,violateSlack] = schedMPC(xIn,...
-            bHatMPC,kpi,Np,A,Bu,M,E,Q,Qf,R,umax,umin,xmin,xmax,uDB)
+            bHatMPC,kpi,Np,A,Bu,M,E1,Q,Qf,R,umax,umin,xmin,xmax,uDB)
 % solve deterministic scheduled MPC with cvx 
 % [U,cost,status,XOut,violateSlack] = schedMPC(xIn,...
-%            bHatMPC,kpi,Np,A,Bu,M,E,Q,Qf,R,umax,umin,xmin,xmax,uDB)
+%            bHatMPC,kpi,Np,A,Bu,M,E1,Q,Qf,R,umax,umin,xmin,xmax)
 % xIn: (Nx x 1) xHat_{t+tc|t-tm}, bHatMPC: (Nv*Nu*Np x 1) bHat_{t+tc-1}
 % kpi: Nv x 1 vector of #steps to constrain control priors 
 % Np: horizon; A,Bu: system
@@ -12,11 +12,6 @@ function [U,cost,status,XOut,violateSlack] = schedMPC(xIn,...
 % xmin and xmax are optional, default is none
 % state constraints implemented with slack variable "barrier"
 % violations ouput gives i (state), j (time step) and violation size
-% uDB is deadband width (NOTE - this makes MPC very slow, requires MIQP
-%   solver such as Gurobi)
-%
-% U is computed plan
-% status is from CVX
 % XOut output gives predicted state trajectory
 
 % BR, 4/29/2014
@@ -121,7 +116,7 @@ end
 % add extra constraints equal to priors
 for i = 1:Nv
     if(kpi(i)>=1)
-        E1i = E((Nu*i-(Nu-1)):(Nu*i),:);
+        E1i = E1((Nu*i-(Nu-1)):(Nu*i),:);
         for k = 1:kpi(i)
             UPrior = E1i*M^(k)*bHatMPC;
             % saturate (in case of rounding error - stay feasible)
