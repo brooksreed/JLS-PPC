@@ -17,7 +17,7 @@ clc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %sys = 'DoubleIntegrator';
-sys = 'SCALAR';
+sys = 'SISO';
 
 % schedule
 
@@ -31,6 +31,7 @@ sys = 'SCALAR';
 %sched = 'SISO4_noACK';
 %sched = 'SISO2_noACK';
 %sched = 'SISO2_piggyback';
+
 
 %sched = 'SISO2ALLCONTROL_noACK';
 %sched = 'SISO2ALLCONTROL_piggyback';
@@ -52,9 +53,9 @@ tc = 1; % control delay
 ta = 1; % ACK delay
 
 % packet success probabilities
-alpha_cBar = .5; % controls
-alpha_mBar = .7;  % measurements
-alpha_aBar = .7; % ACKs (if piggyback used, betaBar overrides gammaBar)
+alphaBar = .5; % controls
+betaBar = .7;  % measurements
+gammaBar = .7; % ACKs (if piggyback used, betaBar overrides gammaBar)
 covPriorAdj = 1;
 
 %%%%%%%%%%%%%%%%%%
@@ -91,7 +92,7 @@ switch sys
         % cov... uncertain position but better-known velocity (closer to zero)
         P1 = [25,0;0,9];     
 
-    case 'SCALAR'
+    case 'SISO'
         
         % Scalar integrator
         A =1;
@@ -126,7 +127,7 @@ xHat1 = zeros(size(A,1),1);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 xIC = 5*randn(size(A,1),1);
 
-if(strfind(sys,'DoubleIntegrator'))
+if(strcmp(sys,'DoubleIntegrator'))
     % position only, no initial velocity (so like step resp from rest)
     xIC(2)=0;xIC(1)=5;
 end
@@ -138,30 +139,29 @@ w = sqrt(W)*randn(size(Bw,1),Ns);
 v = sqrt(V)*randn(size(C,1),Ns);
 
 % packet loss sequences
-alpha_m = zeros(Nv,Ns);alpha_c = zeros(Nv,Ns);alpha_a = zeros(Nv,Ns);
+beta = zeros(Nv,Ns);alpha = zeros(Nv,Ns);gamma = zeros(Nv,Ns);
 for k = 1:Ns
-    alpha_m(:,k) = (sign(rand(Nv,1) - (1-(alpha_mBar)))*0.5 + 0.5);
-    alpha_c(:,k) = (sign(rand(Nv,1) - (1-(alpha_cBar)))*0.5 + 0.5);
-    alpha_a(:,k) = (sign(rand(Nv,1) - (1-(alpha_aBar)))*0.5 + 0.5);
+    beta(:,k) = (sign(rand(Nv,1) - (1-(betaBar)))*0.5 + 0.5);
+    alpha(:,k) = (sign(rand(Nv,1) - (1-(alphaBar)))*0.5 + 0.5);
+    gamma(:,k) = (sign(rand(Nv,1) - (1-(gammaBar)))*0.5 + 0.5);
 end
 
-% hardcoded sequences for consistent debugging
-%alpha_c(:,1:11) = [1 1 0 0 1 1 0 1 0 0 1];
-alpha_m(:,1:11) =  [1 1 1 0 1 1 0 0 0 1 1];
+%alpha(:,1:11) = [1 1 0 0 1 1 0 1 0 0 1];
+beta(:,1:11) =  [1 1 1 0 1 1 0 0 0 1 1];
 
-[Pi_c,Pi_m,Pi_a,tac,Ts] = createSchedule(sched,Nv,Ns,tc);
+[Pi,Xi,Lambda,tap,Ts] = createSchedule(sched,Nv,Ns,tc);
 
 if(strfind(sched,'piggyback'))
     % ACK piggybacked to measurement
-    alpha_a = alpha_m;   % overwrite
+    gamma = beta;   % overwrite
 end
 Np = NpMult*Ts;
 
 %% call sim fcn
 
-[r] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tac,...
-    alpha_cBar,Pi_c,Pi_m,Pi_a,umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,...
-    w,v,alpha_c,alpha_m,alpha_a,covPriorAdj,nACKHistory);
+[r] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tap,...
+    alphaBar,Pi,Xi,Lambda,umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,...
+    w,v,alpha,beta,gamma,covPriorAdj,nACKHistory);
 
 % convenient if want to save:
 r.P1 = P1;
@@ -169,13 +169,13 @@ r.v = v;
 r.w = w;
 r.xIC = xIC;
 r.xHat1 = xHat1;
-r.alpha_c = alpha_c;
-r.alpha_m = alpha_m;
-r.alpha_a = alpha_a;
+r.alpha = alpha;
+r.beta = beta;
+r.gamma = gamma;
 % (could reconstruct from sched but simpler to just save)
-r.Pi_c = Pi_c;
-r.Pi_m = Pi_m;
-r.Pi_a = Pi_a;
+r.Pi = Pi;
+r.Xi = Xi;
+r.Lambda = Lambda;
     
 % (save r struct here if want)
 
@@ -200,22 +200,22 @@ subplot(3,1,[1 2])
 hx = plot(0:Ns-1,CPlot*r.X(1:NxSys,:));
 hold on
 hxh = plot(0:Ns-1,CPlot*r.Xh(1:NxSys,:),'g.:');
-title(sprintf('integrator sys, alphaBar = %0.2f, W=%.1f, V=%.1f',alpha_cBar,W,V))
+title(sprintf('integrator sys, alphaBar = %0.2f, W=%.1f, V=%.1f',alphaBar,W,V))
 
 hb=[];hc=[];
 if(plotLosses)
     for k = 1:Ns
-        if( (r.Pi_c(k) - r.alpha_c(k)*r.Pi_c(k)) == 1 )
+        if( (r.Pi(k) - r.alpha(k)*r.Pi(k)) == 1 )
             %hc = plot([k-1+tc k-1+tc], [-0.25 0],'r');
             hc = plot(k-1+tc,0,'ro');
         end
-        if( (r.Pi_m(k) - r.alpha_m(k)*r.Pi_m(k)) ==1 )
+        if( (r.Xi(k) - r.beta(k)*r.Xi(k)) ==1 )
             %hb = plot([k-1 k-1],[-.75 -.5],'m');
             hb = plot(k-1,-2,'mo');
         end
-%         if( (r.Pi_a(k) - r.alpha_a(k)*r.Pi_a(k)) ==1 )
-%             % need to save/load tac, do on per-veh. basis
-%             ha = plot([k-1-tc-tac k-1-tc-tac],[-.75 -.5],'c');
+%         if( (r.Lambda(k) - r.gamma(k)*r.Lambda(k)) ==1 )
+%             % need to save/load tap, do on per-veh. basis
+%             ha = plot([k-1-tc-tap k-1-tc-tap],[-.75 -.5],'c');
 %         end
     end
 end
@@ -230,7 +230,7 @@ end
 subplot(3,1,3)
 stairs(0:Ns-1,r.u,'k')
 hold on
-stairs(0:Ns-1,r.uNoLoss,'b:')
+stairs(0:Ns-1,r.utilde,'b:')
 legend('u true','u planned')
 %stairs(0:Ns-1,r.w,'b:')
 %legend('u','w')

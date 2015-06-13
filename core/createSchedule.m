@@ -1,6 +1,6 @@
-function [Pi_c,Pi_m,Pi_a,tac,Ts] = createSchedule(sched,Nv,Ns,tc)
-% creates Pi_c, Pi_m, Pi_a schedule
-% [Pi_c,Pi_m,Pi_a,ta_c,Ts] = createSchedule(sched,Nv,Ns,tc)
+function [pi,xi,lambda,tap,Ts] = createSchedule(sched,Nv,Ns,tc)
+% creates pi, xi, lambda schedule
+% [pi,xi,lambda,tap,Ts] = createSchedule(sched,Nv,Ns,tc)
 % Nv: #vehicles, Ns: sim length, tc: control delay
 % sched options:
 % 'RRmeas' -- round-robin for meas, with 1 unused slot (match Ts of MX)
@@ -10,56 +10,57 @@ function [Pi_c,Pi_m,Pi_a,tac,Ts] = createSchedule(sched,Nv,Ns,tc)
 %
 % 'SISO_' options for _piggyback or _noACK:
 % 'SISOALL' - [1],[1] (std. discrete-time)
-% 'SISO2' - [1 0], [0 1] for Pi_c, Pi_m
-% 'SISO4' - [1 0 0 0], [0 0 1 0] for Pi_c, Pi_m
+% 'SISO2' - [1 0], [0 1] for pi, xi
+% 'SISO4' - [1 0 0 0], [0 0 1 0] for pi, xi
 %
-% 'tac' = Nv x 1 vector of time between planned control RX and ACK TX
+% tap = Nv x 1 vector of time between planned control RX and ACK TX
 
 % BR, 4/23/2014
 
-% lots of hardcoding...  make more modular?
+% update 6/17/2014 for ACKs
+% kind of sloppy right now, lots of hardcoding...  make more modular?
 
 if(strfind(sched,'SISOALL'))
     Ts = 1;
-    Pi_cBase = 1;
-    Pi_mBase = 1;
+    piBase = 1;
+    xiBase = 1;
     if(strfind(sched,'piggyback'))
-        Pi_aBase = Pi_mBase;
+        lambdaBase = xiBase;
     elseif(strfind(sched,'noACK'))
-        Pi_aBase = 0;
+        lambdaBase = 0;
     end
 end
 
 if(strfind(sched,'SISO2'))
     Ts = 2;
-    Pi_cBase = [1 0];
-    Pi_mBase = [0 1];
+    piBase = [1 0];
+    xiBase = [0 1];
     if(strfind(sched,'piggyback'))
-        Pi_aBase = Pi_mBase;
+        lambdaBase = xiBase;
     elseif(strfind(sched,'noACK'))
-        Pi_aBase = [0 0];
+        lambdaBase = [0 0];
     end
 end
 
 if(strfind(sched,'SISO2ALLCONTROL'))
     Ts = 2;
-    Pi_cBase = [1 1];
-    Pi_mBase = [0 1];
+    piBase = [1 1];
+    xiBase = [0 1];
     if(strfind(sched,'piggyback'))
-        Pi_aBase = Pi_mBase;
+        lambdaBase = xiBase;
     elseif(strfind(sched,'noACK'))
-        Pi_aBase = [0 0];
+        lambdaBase = [0 0];
     end
 end
 
 if(strfind(sched,'SISO4'))
     Ts = 4;
-    Pi_cBase = [1 0 0 0];
-    Pi_mBase = [0 0 1 0];
+    piBase = [1 0 0 0];
+    xiBase = [0 0 1 0];
     if(strfind(sched,'piggyback'))
-        Pi_aBase = Pi_mBase;
+        lambdaBase = xiBase;
     elseif(strfind(sched,'noACK'))
-        Pi_aBase = [0 0 0 0];
+        lambdaBase = [0 0 0 0];
     end
 end
 
@@ -67,12 +68,12 @@ end
 if(strfind(sched,'RRmeas'))
     sched = 'RRmeas_noACK';
     Ts = Nv+1;  % set RR sched equal to MX sched length
-    Pi_cBase = ones(Nv,Ts);
-    Pi_mBase = zeros(Nv,Ts);
+    piBase = ones(Nv,Ts);
+    xiBase = zeros(Nv,Ts);
     for i = 1:Nv
-        Pi_mBase(i,i) = 1;
+        xiBase(i,i) = 1;
     end
-    Pi_aBase = zeros(Nv,Ts);
+    lambdaBase = zeros(Nv,Ts);
 end
 
 if( ~isempty((strfind(sched,'noACK'))) ||...
@@ -81,74 +82,74 @@ if( ~isempty((strfind(sched,'noACK'))) ||...
     if(strfind(sched,'block'))
 
         Ts = Nv + Nv;
-        Pi_cBase = zeros(Nv,Ts);
+        piBase = zeros(Nv,Ts);
         for i = 1:Nv
-            Pi_cBase(i,Nv+i) = 1;
+            piBase(i,Nv+i) = 1;
         end
-        Pi_mBase = zeros(Nv,Ts);
+        xiBase = zeros(Nv,Ts);
         for i = 1:Nv
-            Pi_mBase(i,i) = 1;
+            xiBase(i,i) = 1;
         end
         
     elseif(strfind(sched,'IL'))
 
         Ts = Nv + Nv;
-        Pi_cBase = zeros(Nv,Ts);
+        piBase = zeros(Nv,Ts);
         for i = 1:Nv
-            Pi_cBase(i,(2*i)) = 1;
+            piBase(i,(2*i)) = 1;
         end
-        Pi_mBase = zeros(Nv,Ts);
+        xiBase = zeros(Nv,Ts);
         for i = 1:Nv
-            Pi_mBase(i,(2*i-1)) = 1;
+            xiBase(i,(2*i-1)) = 1;
         end
         
     elseif(strfind(sched,'MX'))
         Ts = Nv + 1;
-        Pi_cBase = zeros(Nv,Ts);
-        Pi_cBase(:,Ts) = ones(Nv,1);
-        Pi_mBase = zeros(Nv,Ts);
+        piBase = zeros(Nv,Ts);
+        piBase(:,Ts) = ones(Nv,1);
+        xiBase = zeros(Nv,Ts);
         for i = 1:Nv
-            Pi_mBase(i,i) = 1;
+            xiBase(i,i) = 1;
         end
         
     end
     
-    % set Pi_a
+    % set lambda
     if(strfind(sched,'piggyback'))
-        Pi_aBase = Pi_mBase;
+        lambdaBase = xiBase;
     else
-        Pi_aBase = zeros(size(Pi_mBase));
+        lambdaBase = zeros(size(xiBase));
     end
 
 elseif(strfind(sched,'ACK1'))   % dedicated ACK slot right after u
     
     if(strfind(sched,'IL'))
         Ts = Nv + Nv + Nv;
-        Pi_aBase = zeros(Nv,Ts);
+        lambdaBase = zeros(Nv,Ts);
         for i = 1:Nv
-            Pi_aBase(i,(3*i)) = 1;
+            lambdaBase(i,(3*i)) = 1;
         end        
-        Pi_cBase = zeros(Nv,Ts);
+        piBase = zeros(Nv,Ts);
         for i = 1:Nv
-            Pi_cBase(i,(3*i-1)) = 1;
+            piBase(i,(3*i-1)) = 1;
         end
-        Pi_mBase = zeros(Nv,Ts);
+        xiBase = zeros(Nv,Ts);
         for i = 1:Nv
-            Pi_mBase(i,(3*i-2)) = 1;
+            xiBase(i,(3*i-2)) = 1;
         end        
         
     elseif(strfind(sched,'MX'))
         Ts = Nv + Nv + 1;
         
-        Pi_cBase = zeros(Nv,Ts);
-        Pi_cBase(:,Nv+1) = ones(Nv,1);
-        Pi_mBase = zeros(Nv,Ts);
+        piBase = zeros(Nv,Ts);
+        piBase(:,Nv+1) = ones(Nv,1);
+        xiBase = zeros(Nv,Ts);
         for i = 1:Nv
-            Pi_mBase(i,i) = 1;
+            xiBase(i,i) = 1;
         end        
-        Pi_aBase = zeros(Nv,Ts);
+        lambdaBase = zeros(Nv,Ts);
         for i = 1:Nv
-            Pi_aBase(i,Nv+1+i) = 1;
+            lambdaBase(i,Nv+1+i) = 1;
         end
         
     end
@@ -158,28 +159,28 @@ end
 
 
 % compute tap
-tac = zeros(Nv,1);
+tap = zeros(Nv,1);
 if(isempty(strfind(sched,'noACK')))
     for i = 1:Nv
-        Pi_cPos = find(Pi_cBase(i,:))+tc;   % planned control RX
-        Pi_aPos = find(Pi_aBase(i,:));
-        if(Pi_cPos>Pi_aPos)
-            Pi_aPos = Pi_aPos + Ts;
+        piPos = find(piBase(i,:))+tc;   % planned control RX
+        lambdaPos = find(lambdaBase(i,:));
+        if(piPos>lambdaPos)
+            lambdaPos = lambdaPos + Ts;
         end
         try
-            tac(i) = Pi_aPos - Pi_cPos;
+            tap(i) = lambdaPos - piPos;
         catch
             % (SISO2ALLCONTROL -- fix eventually)
-            tac(i) = 0;
+            tap(i) = 0;
         end
     end
 end
 
 nPers = ceil(Ns/Ts);
-Pi_c = repmat(Pi_cBase,1,nPers);
-Pi_m = repmat(Pi_mBase,1,nPers);
-Pi_a = repmat(Pi_aBase,1,nPers);
-Pi_c = Pi_c(:,1:Ns);
-Pi_m = Pi_m(:,1:Ns);
-Pi_a = Pi_a(:,1:Ns);
+pi = repmat(piBase,1,nPers);
+xi = repmat(xiBase,1,nPers);
+lambda = repmat(lambdaBase,1,nPers);
+pi = pi(:,1:Ns);
+xi = xi(:,1:Ns);
+lambda = lambda(:,1:Ns);
 
