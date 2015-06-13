@@ -18,8 +18,11 @@ function [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
 % t: true time at estimator when fcn is called (mostly for debugging)
 % tKF: physical time step KF is updating -- xHat(tKF|tKF) posterior
 
+% v1.0 6/13/2015
 
-% add more Pstars...
+% TO DO: 
+% add more Pstars for SISO
+% add P* for MIMO
 % more streamlined approach vs. hardcode each # steps?
 % (need to load-in "lookup table")
 

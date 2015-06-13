@@ -12,16 +12,16 @@ function [D_cHat,alpha_cHat,D_a,KFstart,tNoACK] = JLSJumpEstimator(...
 
 % BR, 5/27/2015 (modified from single ACK version)
 % 5/28 - ACK histories
+% v1.0 6/13/2015
 
+% TO DO: 
+% refactor for speed/efficiency?
+% improve help @ top...
 
 % note -- actual sending of ack histories can be compressed a lot if
 % consider control schedule (pi), just needs to be re-expanded on the
 % estimator end
 % - future: think about how would work in exps
-
-% initial approach - clarity over efficiency
-% refactor later?
-% update help @ top...
 
 
 % Algorithm will back up as far as it can towards the most recent time of

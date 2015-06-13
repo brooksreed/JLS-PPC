@@ -10,6 +10,8 @@ function [XFwd,p_i] = prepMPC(t,Xh,U_in,D_cIn,Pi_c,...
 % p_i is vector of indices to tell schedMPC when to constrain controls to
 %   priors (due to scheduling)
 
+% v1.0 6/13/2015
+
 nFwds = tm+tc;
 XFwd = zeros(Nv*Np*Nu+Nx,nFwds+1);
 XFwd(:,1) = Xh;
