@@ -1,6 +1,6 @@
-function [results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tap,...
-    alphaBar,Pi,Xi,Lambda,umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,...
-    w,v,alpha,beta,gamma,covPriorAdj,nACKHistory)
+function [results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tac,...
+    alpha_cBar,Pi_c,Pi_m,Pi_a,umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,...
+    w,v,alpha_c,alpha_m,alpha_a,covPriorAdj,nACKHistory)
 % runs simulation of MJLS/scheduled PPC
 
 % currently restricts to time-invariant constraint input
@@ -22,7 +22,7 @@ end
 
 % initialization stuff
 Nx = size(A,1);
-Nv = length(alphaBar);
+Nv = length(alpha_cBar);
 NU = size(Bu,2);    % all controls
 Nu = NU/Nv;         % per-vehicle
 Nw = size(Bw,2);
@@ -42,8 +42,8 @@ if(~ischar(codebook))
 end
 
 M = makeM(Nu,Np,Nv);
-e1t = [1,zeros(1,Np-1)];
-E1 = kron(eye(Nv),kron(e1t,eye(Nu)));
+etmp = [1,zeros(1,Np-1)];
+E = kron(eye(Nv),kron(etmp,eye(Nu)));
 BW = [Bw;zeros(Nu*Np*Nv,Nw)];
 
 X = zeros(Nx+Nu*Np*Nv,Ns);  % includes x and b
@@ -55,20 +55,20 @@ u = zeros(NU,Ns);
 U = zeros(Nu*Np*Nv,Ns);
 
 % initialize Dhat and Dyes
-Dh = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns+tc);   % D hat for estimator
-Ds = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns+tc);   % used to track utilde for cov. prior
-alphaHat = repmat(alphaBar,[1 Ns]);
+D_cHat = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns+tc);   % D hat for estimator
+DcNoLoss = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns+tc);   % used to track utilde for cov. prior
+alphaHat = repmat(alpha_cBar,[1 Ns]);
 for t = (tc+1):Ns
-    Dh(:,:,t) = makeD(Pi(:,t-tc),alphaHat(:,t-tc),Nu,Np);
-    Ds(:,:,t) = makeD(Pi(:,t-tc),Pi(:,t-tc),Nu,Np);
+    D_cHat(:,:,t) = makeD_c(Pi_c(:,t-tc),alphaHat(:,t-tc),Nu,Np);
+    DcNoLoss(:,:,t) = makeD_c(Pi_c(:,t-tc),Pi_c(:,t-tc),Nu,Np);
 end
 
-D = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns);    % true D
-S = zeros(Nv*Ny,Nv*Ny,Ns);
-a = zeros(Nv,Nv,Ns);
+D_c = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns);    % true D
+D_m = zeros(Nv*Ny,Nv*Ny,Ns);
+D_a = zeros(Nv,Nv,Ns);
 
-utilde = zeros(NU,Ns);
-bYes = zeros(Nu*Np*Nv,Ns);
+uNoLoss = zeros(NU,Ns);
+bNoLoss = zeros(Nu*Np*Nv,Ns);
 
 XhMPC = NaN*zeros(Nv*Np*Nu+Nx,tm+tc+1,Ns);	% includes xHatMPC and bHatMPC
 Jcomp = NaN*zeros(1,Ns);
@@ -87,7 +87,7 @@ X(Nx+1:end,1) = zeros(Nu*Np*Nv,1);
 % first step propagation - gives x_2
 X(1:Nx,2) =  A*xIC + w(:,1);
 y(:,2) = C*X(1:Nx,1) + v(:,2);
-u(:,1) = E1*X(Nx+1:end,1);
+u(:,1) = E*X(Nx+1:end,1);
 
 % Loop starts at "estimator" at time t=tm+1, when first meas (t=1) is RX'd
 for t = (tm+1):(Ns-1)
@@ -95,14 +95,15 @@ for t = (tm+1):(Ns-1)
     
     % determine which measurements are available at estimator at this step
     % at step t, meas. are sent at t-tm
-    S(:,:,t-tm) = makeS(Xi(:,t-tm),beta(:,t-tm),Ny);
-    yh(:,t-tm) = S(:,:,t-tm)*y(:,t-tm);     % available tm steps after sent
+    D_m(:,:,t-tm) = makeD_m(Pi_m(:,t-tm),alpha_m(:,t-tm),Ny);
+    yh(:,t-tm) = D_m(:,:,t-tm)*y(:,t-tm);     % available tm steps after sent
     
     if(printDebug)
         fprintf('\n~~~STEP t=%d AT ESTIMATOR~~~\n',t)
-        % (do for multi-channel eventually)
-        if(S(:,:,t-tm)==1)
-            fprintf('\nt=%d, t-%d Meas RX success\n',t,tm)
+        for i = 1:Nv
+            if(Pi_m(i,t-tm)*alpha_m(i,t-tm)==1)
+                fprintf('\nt=%d, t-%d Meas %d RX success\n',t,i,tm)
+            end
         end
     end
     
@@ -111,8 +112,9 @@ for t = (tm+1):(Ns-1)
     % uses tNoACK(t-ta-1) to determine how far back to update
     % updates tNoACK(t-ta) and history based on ACKs RX'd now
     % also increments a lookahead of tNoACK(t-ta+1 --> future)
-    [Dh,alphaHat,a,KFstart,gotACK,tNoACK] = JLSJumpEstimator(Dh,Pi,a,alpha,alphaHat,...
-        Lambda,gamma,t,tm,tc,ta,tap,Nu,Np,tNoACK,nACKHistory,printDebug);
+    [D_cHat,alphaHat,D_a,KFstart,tNoACK] = JLSJumpEstimator(D_cHat,...
+        Pi_c,D_a,alpha_c,alphaHat,Pi_a,alpha_a,t,tm,tc,ta,tac,...
+        Nu,Np,tNoACK,nACKHistory,printDebug);
     
     if(printDebug)
         disp(tNoACK)
@@ -125,13 +127,13 @@ for t = (tm+1):(Ns-1)
     % compute buffer and control action if all control packets through
     if( (t-tm-1) >= 1)
         if(t-tm-1>1)
-            bPrev = bYes(:,t-tm-2);
+            bPrev = bNoLoss(:,t-tm-2);
         else
             bPrev = zeros(Nu*Np*Nv,1);
         end
-        bYes(:,t-tm-1) = M*(eye(Np*Nu*Nv)-Ds(:,:,t-tm-1))*bPrev + ...
-            Ds(:,:,t-tm-1)*U(:,t-tm-1);
-        utilde(:,t-tm-1) = E1*bYes(:,t-tm-1);
+        bNoLoss(:,t-tm-1) = M*(eye(Np*Nu*Nv)-DcNoLoss(:,:,t-tm-1))*bPrev + ...
+            DcNoLoss(:,:,t-tm-1)*U(:,t-tm-1);
+        uNoLoss(:,t-tm-1) = E*bNoLoss(:,t-tm-1);
     end
     
     % run KF from KFstart up until time of recent measurement
@@ -142,8 +144,8 @@ for t = (tm+1):(Ns-1)
             % determine appropriate tNoACK for specific filter step
             tNoACK_KF = zeros(Nv);
             for i = 1:Nv
-                if(td-1-tap(i)>0)
-                    tNoACK_KF(i) = tNoACK(i,td+tap(i)-1);
+                if(td-1-tac(i)>0)
+                    tNoACK_KF(i) = tNoACK(i,td+tac(i)-1);
                 end
             end
             
@@ -156,15 +158,14 @@ for t = (tm+1):(Ns-1)
             end
             
             % prepare control options for use in cov. prior adj.
-            % (fix this later for multivar.)
             UOptions = zeros(NU,tNoACK_KF);
             for k = 1:tNoACK_KF
                 if(td-k<1)
                     bTMP = zeros(Nu*Np*Nv,1);
                 else
-                    bTMP = bYes(:,td-k);
+                    bTMP = bNoLoss(:,td-k);
                 end
-                UOptions(:,k) = E1*M^k*bTMP;
+                UOptions(:,k) = E*M^k*bTMP;
             end
             
         else
@@ -176,30 +177,31 @@ for t = (tm+1):(Ns-1)
         
         if(td<=1)
             AKF = eye(size(A));
-            DKFh = makeD(zeros(Nv,1),zeros(Nv,1),Nu,Np);
+            DKFh = makeD_c(zeros(Nv,1),zeros(Nv,1),Nu,Np);
             XhIn = [xHat1;zeros(Nu*Np*Nv,1)];
             Pin = P1;
             Uin = zeros(Nu*Np*Nv,1);
             yIn = yh(:,1);
-            SIn = S(:,:,1);
+            SIn = D_m(:,:,1);
         else
             AKF = A;
-            DKFh = Dh(:,:,td-1);
+            DKFh = D_cHat(:,:,td-1);
             XhIn = Xh(:,td-1);
             Pin = P(:,:,td-1);
             Uin = U(:,td-1);
             yIn = yh(:,td);
-            SIn = S(:,:,td);
+            SIn = D_m(:,:,td);
         end
         
         % Xh(:,t-tm): xHat_{t-tm|t-tm},bHat_{t-tm-1}
         [Xh(:,td),P(:,:,td)] = JLSKF(XhIn,Pin,yIn,Uin,DKFh,...
-            Nx,Nv,Nu,Np,SIn,AKF,Bu,E1,M,C,W,V,...
-            UOptions,alphaBar,covPriorAdj,tNoACK_KF,t,td);
-        
+            Nx,Nv,Nu,Np,SIn,AKF,Bu,E,M,C,W,V,...
+            t,td,tNoACK_KF,covPriorAdj,UOptions,alpha_cBar);
+       
         if(printDebug)
-            if(Nv==1)
-                fprintf('\nt=%d, KF td=%d, tNoACK_KF(%d)=%d\n',t,td,td+tap(1)-1,tNoACK_KF)
+            for i = 1:Nv
+                fprintf('\nt=%d, KF td=%d, tNoACK_KF(%d)=%d\n',...
+                    t,td,td+tac(i)-1,tNoACK_KF(i))
             end
             if(size(A,1)==1)
                 % only print estimate for scalar sys
@@ -211,7 +213,7 @@ for t = (tm+1):(Ns-1)
     
     %%%%%%%
     % if control is to be computed/sent this step
-    if(max(Pi(:,t)))
+    if(max(Pi_c(:,t)))
         
         %%%%%%%
         
@@ -227,18 +229,18 @@ for t = (tm+1):(Ns-1)
         % *DEBUG NOTE* Goal of XhMPC(:,end,:) is to match true X(:,:)
         
         Ufwd = U(:,(t-tm):(t+tc-1));
-        Dfwd = Dh(:,:,(t-tm):(t+tc-1));
-        [XhMPC(:,:,t+tc),kpi] = prepMPC(t,Xh(:,t-tm),Ufwd,Dfwd,Pi,...
-            A,Bu,E1,M,Nx,Nv,Nu,Np,tm,tc);
+        Dfwd = D_cHat(:,:,(t-tm):(t+tc-1));
+        [XhMPC(:,:,t+tc),kpi] = prepMPC(t,Xh(:,t-tm),Ufwd,Dfwd,Pi_c,...
+            A,Bu,E,M,Nx,Nv,Nu,Np,tm,tc);
         
         solveStatus = 0;
         counter = 1;
         TMPC = Np;
         while(solveStatus==0)
             
-            % compute U_{t+tc}^i, forall i s.t. {Pi(i,t) = 1}
+            % compute U_{t+tc}^i, forall i s.t. {Pi_c(i,t) = 1}
             [Umpc,Jcomp(t),status,XP,~] = schedMPC(XhMPC(1:Nx,end,t+tc),...
-                XhMPC((Nx+1):end,end,t+tc),kpi,TMPC,A,Bu,M,E1,Q,Qf,R,...
+                XhMPC((Nx+1):end,end,t+tc),kpi,TMPC,A,Bu,M,E,Q,Qf,R,...
                 umax,umin,xmin,xmax,[]);
             
             if(strfind(status,'Solved'))
@@ -286,21 +288,21 @@ for t = (tm+1):(Ns-1)
     end
     
     % true system propagation
-    % reshape into MJLS form (for step t), uses D_t(pi(t-tc),alpha(t-tc))
+    % reshape into MJLS form (for step t), uses D_t(pi(t-tc),alpha_c(t-tc))
     if(t<=tc)
-        D(:,:,t) = makeD(zeros(1,Nv),zeros(1,Nv),Nu,Np);
+        D_c(:,:,t) = makeD_c(zeros(1,Nv),zeros(1,Nv),Nu,Np);
     else
-        D(:,:,t) = makeD(Pi(:,t-tc),alpha(:,t-tc),Nu,Np);
+        D_c(:,:,t) = makeD_c(Pi_c(:,t-tc),alpha_c(:,t-tc),Nu,Np);
     end
-    I = eye(size(D(:,:,1)));
-    AA = [A,Bu*E1*M*(I-D(:,:,t));zeros(Nv*Np*Nu,Nx),M*(I-D(:,:,t))];
-    BU = [Bu*E1*D(:,:,t);D(:,:,t)];
+    I = eye(size(D_c(:,:,1)));
+    AA = [A,Bu*E*M*(I-D_c(:,:,t));zeros(Nv*Np*Nu,Nx),M*(I-D_c(:,:,t))];
+    BU = [Bu*E*D_c(:,:,t);D_c(:,:,t)];
     
     % propagate system x_{t+1} = f(D_t,x_t,U_t,w_t)
     X(:,t+1) = AA*X(:,t) + BU*U(:,t) + BW*w(:,t);
     
     % actual applied u_t for saving
-    u(:,t) = E1*X(Nx+1:end,t+1);
+    u(:,t) = E*X(Nx+1:end,t+1);
     
     % measurement z_{t+1}:
     y(:,t+1) = C*X(1:Nx,t+1) + v(:,t+1);
@@ -332,8 +334,8 @@ results.X = X;
 results.u = u;
 results.U = U;
 
-results.utilde = utilde;
-results.bYes = bYes;
+results.uNoLoss = uNoLoss;
+results.bNoLoss = bNoLoss;
 results.tNoACK = tNoACK;
 
 results.Xh = Xh;
