@@ -23,8 +23,8 @@ function [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
 % TO DO: 
 % add more Pstars for SISO
 % add P* for MIMO
-% more streamlined approach vs. hardcode each # steps?
 % (need to load-in "lookup table")
+% add in printDebug
 
 % covariance prior (standard)
 Ppre0 = A*P*A' + W ; %P_{t+1|t}
@@ -32,7 +32,7 @@ Ppre0 = A*P*A' + W ; %P_{t+1|t}
 if( covPriorAdj && (tNoACK>0) )
     
     % UPDATE SO WORKS FOR SISO SYS, NOT JUST SCALAR
-    if(size(A,1)==1)
+    if(size(Bu,2)==1)
         if(tNoACK>2)
             fprintf('\nt=%d, KF tKF=%d ERROR - ACKDropped too large, using Pstar2\n',t,tKF)
             tNoACK=2;
@@ -46,23 +46,29 @@ if( covPriorAdj && (tNoACK>0) )
         
         dU = zeros(1,tNoACK);
         for i = 1:tNoACK
-            dU(:,i) = (ut - uOptions(:,i))*(ut - uOptions(:,i))';
+            dU(:,i) = (ut - uOptions(:,i));
         end
+        %{
+        fprintf('\nt=%d, KF: ut=',t)
+        disp(ut)
+        fprintf('\nt=%d, KF: dU=',t)
+        disp(dU)
+        %}
         
         Pstar = zeros(1,10);
         if(tNoACK==1)
             
-            Pstar(1) = (-alpha_cBar*(alpha_cBar-1))*dU(:,1);
+            Pstar(1) = (alpha_cBar*(1-alpha_cBar))*Bu*dU(:,1)*dU(:,1)'*Bu';
             %Pstar2 = 0;
-            fprintf('\nt=%d, KF tKF=%d, Pstar1 = %f \n',t, tKF, Pstar(1))
+            fprintf('\nt=%d, KF tKF=%d, P* = %f \n',t, tKF, Pstar(1))
             
         elseif(tNoACK==2)
             
             % uses diff with 1-step prev. plan
-            Pstar(1) = (- alpha_cBar^4 + 2*alpha_cBar^3 - 2*alpha_cBar^2 + alpha_cBar)*dU(:,2)^2;
+            Pstar(1) = (- alpha_cBar^4 + 2*alpha_cBar^3 - 2*alpha_cBar^2 + alpha_cBar)*Bu*dU(:,2)*dU(:,2)'*Bu';
             % uses diff with 2-step prev. plan (earliest)
-            Pstar(2) = (- alpha_cBar^4 + 4*alpha_cBar^3 - 5*alpha_cBar^2 + 2*alpha_cBar)*dU(:,1)^2;
-            fprintf('\nt=%d, KF tKF=%d, Pstar1 = %f, Pstar2 = %f \n',t,tKF,Pstar(1),Pstar(2))
+            Pstar(2) = (- alpha_cBar^4 + 4*alpha_cBar^3 - 5*alpha_cBar^2 + 2*alpha_cBar)*Bu*dU(:,1)*dU(:,1)'*Bu';
+            fprintf('\nt=%d, KF tKF=%d, P**(1) = %f, P**(2) = %f \n',t,tKF,Pstar(1),Pstar(2))
 
         elseif(tNoACK>2)
             

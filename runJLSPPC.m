@@ -36,14 +36,15 @@ sys = 'SCALAR';
 % 'SISO2' - [1 0], [0 1] for pi, xi
 % 'SISO4' - [1 0 0 0], [0 0 1 0] for pi, xi 
 
-%sched = 'SISO4_piggyback';
+sched = 'SISO4_piggyback';
 %sched = 'SISO4_noACK';
+
 %sched = 'SISO2_noACK';
 %sched = 'SISO2_piggyback';
 
 %sched = 'SISO2ALLCONTROL_noACK';
 %sched = 'SISO2ALLCONTROL_piggyback';
-sched = 'SISOALL_piggyback';
+%sched = 'SISOALL_piggyback';
 %sched = 'SISOALL_noACK';
 
 % # ACK Histories sent (makes most sense to be multiple of schedule length)
@@ -61,14 +62,14 @@ tc = 1; % control delay
 ta = 1; % ACK delay
 
 % packet success probabilities
-alpha_cBar = .5; % controls
+alpha_cBar = .75; % controls
 alpha_mBar = .7;  % measurements
 alpha_aBar = .7; % ACKs (if piggyback used, betaBar overrides gammaBar)
 covPriorAdj = 1;
 
 %%%%%%%%%%%%%%%%%%
 
-Ns = 20; % sim length
+Ns = 40; % sim length
 NpMult = 4; % the MPC horizon Np = Ts*NpMult 
 Nv = 1;   % # vehicles (comms channels)
 
@@ -156,7 +157,7 @@ end
 
 % hardcoded sequences for consistent debugging
 %alpha_c(:,1:11) = [1 1 0 0 1 1 0 1 0 0 1];
-alpha_m(:,1:11) =  [1 1 1 0 1 1 0 0 0 1 1];
+%alpha_m(:,1:11) =  [1 1 1 0 1 1 0 0 0 1 1];
 
 [Pi_c,Pi_m,Pi_a,tac,Ts] = createSchedule(sched,Nv,Ns,tc);
 

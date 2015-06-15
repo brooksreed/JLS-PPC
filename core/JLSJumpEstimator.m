@@ -18,24 +18,16 @@ function [D_cHat,alpha_cHat,D_a,KFstart,tNoACK] = JLSJumpEstimator(...
 % refactor for speed/efficiency?
 % improve help @ top...
 
-% note -- actual sending of ack histories can be compressed a lot if
-% consider control schedule (pi), just needs to be re-expanded on the
-% estimator end
-% - future: think about how would work in exps
-
-
 % Algorithm will back up as far as it can towards the most recent time of
 % an ACK, using ACK histories.  
 % It does not back up extra far (does not use all ACK history if not
 % needed).  
 
-% tNoACK counter is updated with a "lag" of ta
 % tNoACK(t-ta) resets to zero if ACK received at time t 
 
 nACKs = size(tNoACK,1);
 
 % Algorithm uses previous step counter when figuring out how far to back up
-% tNoACK for step t-ta-1 used by algorithm
 if(t-ta-1>0)
     tNoACKAlg = tNoACK(:,t-ta-1);
 else
@@ -49,7 +41,6 @@ for i = 1:nACKs
 end
 
 % determine ACKs available at this step
-% at step t, ACKs are sent at t-ta
 if(t-ta<1)
     aInds = [];
 else
@@ -60,7 +51,7 @@ end
 % use ACK information to update Dhat and alphaHat
 
 % check at start - don't reference negative times
-% slight hack, more precise check would individual channels... 
+% slight hack, more precise would check individual channels... 
 checkStart = (t-ta-max(tac)>tc);
 if( ~isempty(aInds) && checkStart )
     
@@ -80,7 +71,7 @@ if( ~isempty(aInds) && checkStart )
     for i = aInds
         % run fwd incorporating new ACKs
         for tprime = tACK{i}
-            % update specific alphaHat's
+            % update specific alpha_cHat's
             alpha_cHat(i,tprime-tc) = alpha_c(i,tprime-tc);
         end
     end
@@ -91,8 +82,8 @@ if( ~isempty(aInds) && checkStart )
     
     % update Dhat using alphahat
     for tprime = backupStart:backupEnd
-        D_cHat(:,:,tprime) = makeD_c(Pi_c(:,tprime-tc),alpha_cHat(:,tprime-tc),...
-            Nu,Np);
+        D_cHat(:,:,tprime) = makeD_c(Pi_c(:,tprime-tc),...
+            alpha_cHat(:,tprime-tc),Nu,Np);
     end
     
     % KFstart is the oldest (a posteriori) step of backup-rerun
