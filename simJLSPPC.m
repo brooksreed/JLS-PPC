@@ -10,8 +10,8 @@ function [results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tac,...
 % modifying for delayed ACKs, 6/13/2014
 % v1.0 6/13/2015
 
-% TO DO: 
-% Clean up printouts? 
+% TO DO:
+% Clean up printouts?
 % Make sure prep for KF is ready for MIMO and multiple P*s
 % Add more automated tests/checks?
 
@@ -199,11 +199,13 @@ for t = (tm+1):(Ns-1)
         [Xh(:,td),P(:,:,td)] = JLSKF(XhIn,Pin,yIn,Uin,DKFh,...
             Nx,Nv,Nu,Np,SIn,AKF,Bu,E,M,C,W,V,...
             t,td,tNoACK_KF,covPriorAdj,UOptions,alpha_cBar);
-       
+        
         if(printDebug)
-            for i = 1:Nv
-                fprintf('\nt=%d, KF td=%d, tNoACK_KF(%d)=%d\n',...
-                    t,td,td+tac(i)-1,tNoACK_KF(i))
+            if(covPriorAdj)
+                for i = 1:Nv
+                    fprintf('\nt=%d, KF td=%d, tNoACK_KF(%d)=%d\n',...
+                        t,td,td+tac(i)-1,tNoACK_KF(i))
+                end
             end
             if(size(A,1)==1)
                 % only print estimate for scalar sys

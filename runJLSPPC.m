@@ -10,7 +10,7 @@
 % automated saving/logging?
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% double integrator system
+% double integrator or scalar systems
 % a few options for schedules
 % handles varying lengths of ACK histories
 
@@ -25,8 +25,8 @@ clc
 % SYSTEM DEFINITION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%sys = 'DoubleIntegrator';
-sys = 'SCALAR';
+system = 'SISO_DOUBLE_INTEGRATOR';
+%system = 'SCALAR';
 
 % schedule
 
@@ -36,11 +36,11 @@ sys = 'SCALAR';
 % 'SISO2' - [1 0], [0 1] for pi, xi
 % 'SISO4' - [1 0 0 0], [0 0 1 0] for pi, xi 
 
-sched = 'SISO4_piggyback';
+%sched = 'SISO4_piggyback';
 %sched = 'SISO4_noACK';
 
 %sched = 'SISO2_noACK';
-%sched = 'SISO2_piggyback';
+sched = 'SISO2_piggyback';
 
 %sched = 'SISO2ALLCONTROL_noACK';
 %sched = 'SISO2ALLCONTROL_piggyback';
@@ -48,7 +48,7 @@ sched = 'SISO4_piggyback';
 %sched = 'SISOALL_noACK';
 
 % # ACK Histories sent (makes most sense to be multiple of schedule length)
-% For 'SINGLE ACK': set nACKHistory = Ts (schedule length)
+% For 'SINGLE ACK': sys nACKHistory = Ts (schedule length)
 nACKHistory = 5;
 
 % NOTE:
@@ -69,12 +69,12 @@ covPriorAdj = 1;
 
 %%%%%%%%%%%%%%%%%%
 
-Ns = 40; % sim length
+Ns = 80; % sim length
 NpMult = 4; % the MPC horizon Np = Ts*NpMult 
 Nv = 1;   % # vehicles (comms channels)
 
-switch sys
-    case 'DoubleIntegrator'
+switch system
+    case 'SISO_DOUBLE_INTEGRATOR'
         
         % Double Integrator
         A =[1,1;0,1];
@@ -136,7 +136,7 @@ xHat1 = zeros(size(A,1),1);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 xIC = 5*randn(size(A,1),1);
 
-if(strfind(sys,'DoubleIntegrator'))
+if(size(A,1)==2)
     % position only, no initial velocity (so like step resp from rest)
     xIC(2)=0;xIC(1)=5;
 end
@@ -144,7 +144,7 @@ end
 % (IF WANT TO DEBUG CONTROLLER - INIT ESTIMATOR PERFECTLY)
 % xHat1 = xIC;P1 = 1*eye(2);
 
-w = sqrt(W)*randn(size(Bw,1),Ns);
+w = sqrt(W)*randn(size(Bw,2),Ns);
 v = sqrt(V)*randn(size(C,1),Ns);
 
 % packet loss sequences
@@ -169,11 +169,15 @@ Np = NpMult*Ts;
 
 %% call sim fcn
 
+% hack to overwrite covPriorAdj and rerun with same everything else
+covPriorAdj = 0;
+
 [r] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tac,...
     alpha_cBar,Pi_c,Pi_m,Pi_a,umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,...
     w,v,alpha_c,alpha_m,alpha_a,covPriorAdj,nACKHistory);
 
-% convenient if want to save:
+% add to r struct for saving:
+% run-specific parameters
 r.P1 = P1;
 r.v = v;
 r.w = w;
@@ -182,72 +186,39 @@ r.xHat1 = xHat1;
 r.alpha_c = alpha_c;
 r.alpha_m = alpha_m;
 r.alpha_a = alpha_a;
-% (could reconstruct from sched but simpler to just save)
 r.Pi_c = Pi_c;
 r.Pi_m = Pi_m;
 r.Pi_a = Pi_a;
-    
+
+% system
+sys.system = system;
+sys.sched = sched;
+sys.A = A;
+sys.Bu = Bu;
+sys.C = C;
+sys.umax = umax;
+sys.umin = umin;
+sys.nLevels = nLevels;
+sys.Q = Q;
+sys.Qf = Qf;
+sys.R = R;
+sys.NpMult = NpMult;
+sys.W = W;
+sys.V = V;
+sys.alpha_cBar = alpha_cBar;
+sys.alpha_mBar = alpha_mBar;
+sys.alpha_aBar = alpha_aBar;
+sys.ta = ta;
+sys.tc = tc;
+sys.tm = tm;
+
+r.sys = sys;
+
 % (save r struct here if want)
 
-%% plots (for SISO systems)
+%% plots
+plotJLSPPC_SISO(r)
 
-if(size(A,1)==2)
-    CPlot = [1 0];  % output for plotting
-else
-    CPlot = 1;
-end
 
-plotXhMPC = 1;  % plots prediction used for computing control
-plotLosses = 1; % plots packet losses for c, m (no a right now)
 
-% (could be used with a saved r struct too)
-NxSys = size(r.P,1);    % underlying system states (no buffer)
-Ns = size(r.X,2);
-
-figure
-
-subplot(3,1,[1 2])
-hx = plot(0:Ns-1,CPlot*r.X(1:NxSys,:));
-hold on
-hxh = plot(0:Ns-1,CPlot*r.Xh(1:NxSys,:),'g.:');
-title(sprintf('integrator sys, alphaBar = %0.2f, W=%.1f, V=%.1f',alpha_cBar,W,V))
-
-hb=[];hc=[];
-if(plotLosses)
-    for k = 1:Ns
-        if( (r.Pi_c(k) - r.alpha_c(k)*r.Pi_c(k)) == 1 )
-            %hc = plot([k-1+tc k-1+tc], [-0.25 0],'r');
-            hc = plot(k-1+tc,0,'ro');
-        end
-        if( (r.Pi_m(k) - r.alpha_m(k)*r.Pi_m(k)) ==1 )
-            %hb = plot([k-1 k-1],[-.75 -.5],'m');
-            hb = plot(k-1,-2,'mo');
-        end
-%         if( (r.Pi_a(k) - r.alpha_a(k)*r.Pi_a(k)) ==1 )
-%             % need to save/load tac, do on per-veh. basis
-%             ha = plot([k-1-tc-tac k-1-tc-tac],[-.75 -.5],'c');
-%         end
-    end
-end
-
-if(plotXhMPC)
-    hxhm = plot(0:Ns-1,CPlot*squeeze(r.XhMPC(1:NxSys,end,1:Ns)),'k.');
-    legend([hx hxh hxhm hc hb],'X','XHat','XHatMPC','c loss','m loss')
-else
-    legend([hx hxh hc hb],'X','XHat','c loss','m loss')
-end
-
-subplot(3,1,3)
-stairs(0:Ns-1,r.u,'k')
-hold on
-stairs(0:Ns-1,r.uNoLoss,'b:')
-legend('u true','u planned')
-%stairs(0:Ns-1,r.w,'b:')
-%legend('u','w')
-xlabel('time step')
-
-if(size(r.P,1)==1)
-    figure
-    plot(squeeze(r.P))
-end
 
