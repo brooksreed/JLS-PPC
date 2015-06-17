@@ -3,7 +3,8 @@ function plotJLSPPC_SISO(r)
 % r structure of results
 % also r.sys: system settings (only tc required right now)
 
-% 
+% v1.1 6/16/2015
+
 
 % in r struct, P is a proxy for size of A
 if(size(r.P,1)==2)

@@ -19,10 +19,9 @@ function [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
 % tKF: physical time step KF is updating -- xHat(tKF|tKF) posterior
 
 % v1.0 6/13/2015
+% v1.1 6/16/2015
 
 % TO DO: 
-% Pstar SISO, state>1: printout
-
 % more Pstars for SISO
 % add P* for MIMO
 % (need to load-in "lookup table")
@@ -60,10 +59,12 @@ if( covPriorAdj && (tNoACK>0) )
         Pstar = zeros(size(P,1),size(P,2),10);
         if(tNoACK==1)
             
-            Pstar(:,:,1) = (alpha_cBar*(1-alpha_cBar))*Bu*dU(:,1)*dU(:,1)'*Bu';
+            Pstar(:,:,1) = (alpha_cBar*(1-alpha_cBar))*Bu*dU(:,1)*...
+                dU(:,1)'*Bu';
             %Pstar2 = 0;
             if(size(Pstar,1)==1)
-                fprintf('\nt=%d, KF tKF=%d, P* = %f \n',t, tKF, squeeze(Pstar(:,:,1)))
+                fprintf('\nt=%d, KF tKF=%d, P* = %f \n',t, tKF,...
+                    squeeze(Pstar(:,:,1)))
             else
                 fprintf('\nt=%d, KF tKF=%d, P* = \n',t, tKF)
                 disp(squeeze(Pstar(:,:,1)))
@@ -72,13 +73,17 @@ if( covPriorAdj && (tNoACK>0) )
         elseif(tNoACK==2)
             
             % uses diff with 1-step prev. plan
-            Pstar(:,:,1) = (- alpha_cBar^4 + 2*alpha_cBar^3 - 2*alpha_cBar^2 + alpha_cBar)*Bu*dU(:,2)*dU(:,2)'*Bu';
+            Pstar(:,:,1) = (- alpha_cBar^4 + 2*alpha_cBar^3 - ...
+                2*alpha_cBar^2 + alpha_cBar)*Bu*dU(:,2)*dU(:,2)'*Bu';
             % uses diff with 2-step prev. plan (earliest)
-            Pstar(:,:,2) = (- alpha_cBar^4 + 4*alpha_cBar^3 - 5*alpha_cBar^2 + 2*alpha_cBar)*Bu*dU(:,1)*dU(:,1)'*Bu';
+            Pstar(:,:,2) = (- alpha_cBar^4 + 4*alpha_cBar^3 - ...
+                5*alpha_cBar^2 + 2*alpha_cBar)*Bu*dU(:,1)*dU(:,1)'*Bu';
             if(size(Pstar,1)==1)
-                fprintf('\nt=%d, KF tKF=%d, P**(1) = %f, P**(2) = %f \n',t,tKF,squeeze(Pstar(:,:,1)),squeeze(Pstar(:,:,2)))
+                fprintf('\nt=%d, KF tKF=%d, P**(1) = %f, P**(2) = %f \n',...
+                    t,tKF,squeeze(Pstar(:,:,1)),squeeze(Pstar(:,:,2)))
             else
-                fprintf('\nt=%d, KF tKF=%d, P**(1) =    , P**(2) =     \n',t,tKF)
+                fprintf('\nt=%d, KF tKF=%d, P**(1) =    , P**(2) =     \n',...
+                    t,tKF)
                 disp([squeeze(Pstar(:,:,1)),squeeze(Pstar(:,:,2))])
             end
 

@@ -2,11 +2,17 @@
 % BR, 5/27/2015
 
 % v1.0 6/13/2015
+% v1.1 6/16/2015
 
 % TO DO: 
+
 % clean up/separate inputs vs. other? 
 % one toggle for 'debugging mode'?
-% better plots
+% more detailed plots for SISO
+
+% MIMO: cleaner system setup, make Nc and Nm vs. Nv? 
+% MIMO basic plots
+
 % automated saving/logging?
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -25,7 +31,8 @@ clc
 % SYSTEM DEFINITION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-system = 'SISO_DOUBLE_INTEGRATOR';
+%system = 'SISO_DOUBLE_INTEGRATOR';
+system = 'MIMO_DOUBLE_INTEGRATOR';
 %system = 'SCALAR';
 
 % schedule
@@ -40,12 +47,16 @@ system = 'SISO_DOUBLE_INTEGRATOR';
 %sched = 'SISO4_noACK';
 
 %sched = 'SISO2_noACK';
-sched = 'SISO2_piggyback';
+%sched = 'SISO2_piggyback';
 
 %sched = 'SISO2ALLCONTROL_noACK';
 %sched = 'SISO2ALLCONTROL_piggyback';
 %sched = 'SISOALL_piggyback';
 %sched = 'SISOALL_noACK';
+
+% 'MIMO' options: MX, IL
+sched = 'MX_piggyback';
+%sched = 'MX_noACK';
 
 % # ACK Histories sent (makes most sense to be multiple of schedule length)
 % For 'SINGLE ACK': sys nACKHistory = Ts (schedule length)
@@ -62,16 +73,22 @@ tc = 1; % control delay
 ta = 1; % ACK delay
 
 % packet success probabilities
-alpha_cBar = .75; % controls
-alpha_mBar = .7;  % measurements
-alpha_aBar = .7; % ACKs (if piggyback used, betaBar overrides gammaBar)
+if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
+    alpha_cBar = .75; % controls
+    alpha_mBar = .7;  % measurements
+    alpha_aBar = .7; % ACKs (if piggyback used, betaBar overrides gammaBar)
+else
+    alpha_cBar = [.75;.75];
+    alpha_mBar = [.75;.75];
+    alpha_aBar = [.75;.75];
+end
 covPriorAdj = 1;
 
 %%%%%%%%%%%%%%%%%%
 
-Ns = 80; % sim length
+Ns = 20; % sim length
 NpMult = 4; % the MPC horizon Np = Ts*NpMult 
-Nv = 1;   % # vehicles (comms channels)
+Nv = size(alpha_cBar,1);   % # vehicles (comms channels)
 
 switch system
     case 'SISO_DOUBLE_INTEGRATOR'
@@ -81,16 +98,14 @@ switch system
         Bu = [0.5;1];
         Bw = Bu;
         C = [1 0];      % position output
-        %C = eye(2);    % full state output
-
-        Q = [10,0;0,1];
-        Qf = 10*Q;
-        R = 1;
-        umax = 10;
+        umax = 10;      
         umin = -10;
         Xmax = [];Xmin = [];
         nLevels = 15;   % quantization levels
         codebook = linspace(umin,umax,nLevels);
+        Q = [10,0;0,1];
+        Qf = 10*Q;
+        R = 1;
 
         % process/measurement noise
         W = 1;
@@ -100,7 +115,33 @@ switch system
         
         % cov... uncertain position but better-known velocity (closer to zero)
         P1 = [25,0;0,9];     
+        
+ case 'MIMO_DOUBLE_INTEGRATOR'
+        
+        % Double Integrator
+        A =[1,1;0,1];
+        Bu = eye(2);
+        Bw = Bu;
+        C = eye(2);    % full state output
 
+        Q = [10,0;0,1];
+        Qf = 10*Q;
+        R = eye(2);
+        umax = [10;10];
+        umin = [-10;-10];
+        Xmax = [];Xmin = [];
+        nLevels = 15;   % quantization levels
+        codebook = linspace(min(umin),max(umax),nLevels);
+
+        
+        % process/measurement noise
+        W = eye(2);
+        V = eye(2);
+        
+        % cov... uncertain position but better-known velocity (closer to zero)
+        P1 = [25,0;0,9];     
+        covPriorAdj = 0;    % always (for now...)
+        
     case 'SCALAR'
         
         % Scalar integrator
@@ -172,52 +213,38 @@ Np = NpMult*Ts;
 % hack to overwrite covPriorAdj and rerun with same everything else
 covPriorAdj = 0;
 
+% (pull-out run-specific parameters for re-running?)
+
 [r] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tac,...
     alpha_cBar,Pi_c,Pi_m,Pi_a,umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,...
     w,v,alpha_c,alpha_m,alpha_a,covPriorAdj,nACKHistory);
 
-% add to r struct for saving:
-% run-specific parameters
-r.P1 = P1;
-r.v = v;
-r.w = w;
-r.xIC = xIC;
-r.xHat1 = xHat1;
-r.alpha_c = alpha_c;
-r.alpha_m = alpha_m;
-r.alpha_a = alpha_a;
-r.Pi_c = Pi_c;
-r.Pi_m = Pi_m;
-r.Pi_a = Pi_a;
+r.sys.sched = sched;
+r.sys.system =system;
+%r.sys.alpha_cBar = alpha_cBar; (added inside)
+r.sys.alpha_mBar = alpha_mBar;
+r.sys.alpha_aBar = alpha_aBar;
 
-% system
-sys.system = system;
-sys.sched = sched;
-sys.A = A;
-sys.Bu = Bu;
-sys.C = C;
-sys.umax = umax;
-sys.umin = umin;
-sys.nLevels = nLevels;
-sys.Q = Q;
-sys.Qf = Qf;
-sys.R = R;
-sys.NpMult = NpMult;
-sys.W = W;
-sys.V = V;
-sys.alpha_cBar = alpha_cBar;
-sys.alpha_mBar = alpha_mBar;
-sys.alpha_aBar = alpha_aBar;
-sys.ta = ta;
-sys.tc = tc;
-sys.tm = tm;
-
-r.sys = sys;
 
 % (save r struct here if want)
+%{
+
+old = cd('C:\Brooks\Dropbox\Research Dropbox\MATLAB Code\JLS-PPC local');
+fname = sprintf('results_%s',dateString('DHM'));
+save(fname,'r')
+
+%or rename r 
+uniquer = r;
+save(fname,'uniquer')
+cd(old)
+
+%}
+
 
 %% plots
-plotJLSPPC_SISO(r)
+if(size(C,1)==1 && size(Bu,2)==1)
+    plotJLSPPC_SISO(r)
+end
 
 
 

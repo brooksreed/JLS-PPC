@@ -13,10 +13,12 @@ function [D_cHat,alpha_cHat,D_a,KFstart,tNoACK] = JLSJumpEstimator(...
 % BR, 5/27/2015 (modified from single ACK version)
 % 5/28 - ACK histories
 % v1.0 6/13/2015
+% v1.1 6/16/2015
 
 % TO DO: 
 % refactor for speed/efficiency?
 % improve help @ top...
+% try-catch on Dhat -- due to negative index.  Specific check? 
 
 % Algorithm will back up as far as it can towards the most recent time of
 % an ACK, using ACK histories.  
@@ -82,8 +84,12 @@ if( ~isempty(aInds) && checkStart )
     
     % update Dhat using alphahat
     for tprime = backupStart:backupEnd
-        D_cHat(:,:,tprime) = makeD_c(Pi_c(:,tprime-tc),...
-            alpha_cHat(:,tprime-tc),Nu,Np);
+        try
+            D_cHat(:,:,tprime) = makeD_c(Pi_c(:,tprime-tc),...
+                alpha_cHat(:,tprime-tc),Nu,Np);
+        catch
+            disp('warning skipping D_cHat update')
+        end
     end
     
     % KFstart is the oldest (a posteriori) step of backup-rerun
@@ -110,7 +116,6 @@ end
 
 % increment tNoACK (plus lookahead)
 if( (t-ta-1)>0 )
-    % (once this works, modify for multivar)
     
     nL = 10;
     
@@ -121,10 +126,6 @@ if( (t-ta-1)>0 )
         maxadd = t-ta+nL;
     end
     lookahead = 1:(maxadd-(t-ta));
-    
-    % increment future starting from current value
-    %startVal = tNoACK(:,t-ta-1);
-    %tNoACK(:,(t-ta):maxadd)  =  lookahead + startVal;
     
     % update tNoACK based on new ACKs this step (t-ta)
     for i = 1:nACKs

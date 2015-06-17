@@ -9,10 +9,12 @@ function [results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tac,...
 % BR, 4/23/2014
 % modifying for delayed ACKs, 6/13/2014
 % v1.0 6/13/2015
+% v1.1 6/16/2015
 
 % TO DO:
 % Clean up printouts?
 % Make sure prep for KF is ready for MIMO and multiple P*s
+% Add logging of P*, P**, etc.?
 % Add more automated tests/checks?
 
 printDebug = 1;
@@ -313,15 +315,6 @@ for t = (tm+1):(Ns-1)
     
     looptime(t) = toc(looptic);
     
-    %%%%%%%
-    %     if( (t>3) && printouts)
-    %         try
-    %             printoutsJLSPPC
-    %         catch
-    %             disp('printout error')
-    %         end
-    %     end
-    
 end
 
 xF = X(1:Nx,end);
@@ -333,6 +326,9 @@ for t = 2:Ns
 end
 % final state (affected by final u)
 Jsim = jj + xF'*Q*xF;
+
+
+% add to results struct for saving:
 
 results.X = X;
 results.u = u;
@@ -355,6 +351,38 @@ results.looptime = looptime;
 results.Jsim = Jsim/Ns;
 results.rmsEstError = nanrms(X(1:Nv,:) - Xh(1:Nv,:),2);
 results.rmsPosError = nanrms(X(1,:),2);
+
+% run-specific parameters
+results.P1 = P1;
+results.v = v;
+results.w = w;
+results.xIC = xIC;
+results.xHat1 = xHat1;
+results.alpha_c = alpha_c;
+results.alpha_m = alpha_m;
+results.alpha_a = alpha_a;
+results.Pi_c = Pi_c;
+results.Pi_m = Pi_m;
+results.Pi_a = Pi_a;
+
+% system
+sys.A = A;
+sys.Bu = Bu;
+sys.C = C;
+sys.umax = umax;
+sys.umin = umin;
+sys.Q = Q;
+sys.Qf = Qf;
+sys.R = R;
+sys.Np = Np;
+sys.W = W;
+sys.V = V;
+sys.alpha_cBar = alpha_cBar;
+sys.ta = ta;
+sys.tc = tc;
+sys.tm = tm;
+
+results.sys = sys;
 
 end
 
