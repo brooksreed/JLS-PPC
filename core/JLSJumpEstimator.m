@@ -82,13 +82,36 @@ if( ~isempty(aInds) && checkStart )
     backupStart = min(min_tACK);
     backupEnd = max(max_tACK);
     
+    
+    
+    % (HACK -- SHOULDN'T THIS BE TAKEN CARE OF ABOVE...?)
+    if(backupStart<=tc)
+        backupStart = tc+1;
+    end
+    
+    
+    
+    
     % update Dhat using alphahat
     for tprime = backupStart:backupEnd
         try
             D_cHat(:,:,tprime) = makeD_c(Pi_c(:,tprime-tc),...
                 alpha_cHat(:,tprime-tc),Nu,Np);
         catch
+            
+            
+            
+            
+            
+            
+            % THIS IS GHETTO - BETTER ERROR CHECKING FOR (-) ARGS
             disp('warning skipping D_cHat update')
+            
+            
+            
+            
+            
+            
         end
     end
     

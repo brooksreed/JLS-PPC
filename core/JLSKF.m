@@ -30,9 +30,23 @@ function [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
 % covariance prior (standard)
 Ppre0 = A*P*A' + W ; %P_{t+1|t}
 
-if( covPriorAdj && (tNoACK>0) )
-    
-    % UPDATE SO WORKS FOR SISO SYS, NOT JUST SCALAR
+if( covPriorAdj && (max(tNoACK)>0) )
+          
+    % SENT control command for step t
+    ut = E*USent;
+
+    dU = zeros(size(ut,1),max(tNoACK));
+    for i = 1:max(tNoACK)
+        dU(:,i) = (ut - uOptions(:,i));
+    end
+    %{
+    fprintf('\nt=%d, KF: ut=',t)
+    disp(ut)
+    fprintf('\nt=%d, KF: dU=',t)
+    disp(dU)
+    %}
+        
+    % Single input systems
     if(size(Bu,2)==1)
         if(tNoACK>2)
             fprintf('\nt=%d, KF tKF=%d ERROR - ACKDropped too large, using Pstar2\n',t,tKF)
@@ -40,22 +54,7 @@ if( covPriorAdj && (tNoACK>0) )
         end
         
         % NOTE -- uHistory are from prev. COMPUTED buffers
-        % they are not necessarily shifts of the buffer estimate in Xh
-        
-        % SENT control command for step t
-        ut = E*USent;
-        
-        dU = zeros(1,tNoACK);
-        for i = 1:tNoACK
-            dU(:,i) = (ut - uOptions(:,i));
-        end
-        %{
-        fprintf('\nt=%d, KF: ut=',t)
-        disp(ut)
-        fprintf('\nt=%d, KF: dU=',t)
-        disp(dU)
-        %}
-        
+        % they are not necessarily shifts of the buffer estimate in Xh        
         Pstar = zeros(size(P,1),size(P,2),10);
         if(tNoACK==1)
             
@@ -98,11 +97,20 @@ if( covPriorAdj && (tNoACK>0) )
         Ppre = Ppre0+sum(Pstar,3);
         
     else
-        disp('WARNING - cov. prior adjust not formulated for multivar. systems')
+        %disp('WARNING - cov. prior adjust not formulated for multivar. systems')
         
-        %{
+        %
         % single-step: Pstar
         % works for MIMO
+        EAZA = diag(alpha_cBar)*dU(:,1)*dU(:,1)'*diag(alpha_cBar);   % off diagonal elements
+        dum = diag(alpha_cBar)*dU(:,1)*dU(:,1)';     % replace diagonal elements
+        for i = 1:Nu; EAZA(i,i) = dum(i,i) ; end;
+        
+        Pstar = Bu*(EAZA - diag(alpha_cBar)*dU(:,1)*dU(:,1)'*diag(alpha_cBar))*Bu';
+        
+        Ppre = Ppre0+Pstar
+        
+        %{
         % covariance prior: scale control by alphabar -- diagonal matrix
         ubuff = E1*M*Xh(Nx+1:end);    % one shift of previous buffer
         qq = (ut - ubuff)*(ut - ubuff)' ;

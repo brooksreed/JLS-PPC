@@ -121,7 +121,7 @@ for t = (tm+1):(Ns-1)
         Nu,Np,tNoACK,nACKHistory,printDebug);
     
     if(printDebug)
-        disp(tNoACK)
+        %disp(tNoACK)
     end
     
     %%%%%%%%%%%%%%%
@@ -146,7 +146,7 @@ for t = (tm+1):(Ns-1)
         if(covPriorAdj)
             
             % determine appropriate tNoACK for specific filter step
-            tNoACK_KF = zeros(Nv);
+            tNoACK_KF = zeros(1,Nv);
             for i = 1:Nv
                 if(td-1-tac(i)>0)
                     tNoACK_KF(i) = tNoACK(i,td+tac(i)-1);
@@ -154,16 +154,25 @@ for t = (tm+1):(Ns-1)
             end
             
             % constrain to ACK history length if needed
-            if(tNoACK_KF>nACKHistory)
-                tNoACK_KF = nACKHistory;
+            % (modify for vector nACKHistory?)
+            for i = 1:Nv
+            if(tNoACK_KF(i)>nACKHistory)
+                tNoACK_KF(i) = nACKHistory;
                 if(printDebug)
                     disp('truncating ACK history')
                 end
             end
+            end
             
             % prepare control options for use in cov. prior adj.
-            UOptions = zeros(NU,tNoACK_KF);
-            for k = 1:tNoACK_KF
+            
+            
+            % IS USING max(tNoACK_KF) CORRECT HERE? 
+            
+            
+            
+            UOptions = zeros(NU,max(tNoACK_KF));
+            for k = 1:max(tNoACK_KF)
                 if(td-k<1)
                     bTMP = zeros(Nu*Np*Nv,1);
                 else

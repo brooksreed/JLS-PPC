@@ -31,6 +31,8 @@ clc
 % SYSTEM DEFINITION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+Ns = 50; % sim length
+
 %system = 'SISO_DOUBLE_INTEGRATOR';
 system = 'MIMO_DOUBLE_INTEGRATOR';
 %system = 'SCALAR';
@@ -38,7 +40,6 @@ system = 'MIMO_DOUBLE_INTEGRATOR';
 % schedule
 
 % 'SISO_' options for _piggyback or _noACK:
-% (NOTE - if piggyback, ta should equal tm)
 % 'SISOALL' - [1],[1] - std. discrete time
 % 'SISO2' - [1 0], [0 1] for pi, xi
 % 'SISO4' - [1 0 0 0], [0 0 1 0] for pi, xi 
@@ -61,6 +62,8 @@ sched = 'MX_piggyback';
 % # ACK Histories sent (makes most sense to be multiple of schedule length)
 % For 'SINGLE ACK': sys nACKHistory = Ts (schedule length)
 nACKHistory = 5;
+% adjustment to covariance priors due to no ACKs/control losses:
+covPriorAdj = 1;
 
 % NOTE:
 % With very long ACK history, a posteriori estimate should have no effects
@@ -82,11 +85,15 @@ else
     alpha_mBar = [.75;.75];
     alpha_aBar = [.75;.75];
 end
-covPriorAdj = 1;
+
+% check: 
+if(strfind(sched,'piggyback'))
+    ta = tm;
+    alpha_aBar = alpha_mBar;
+end
 
 %%%%%%%%%%%%%%%%%%
 
-Ns = 20; % sim length
 NpMult = 4; % the MPC horizon Np = Ts*NpMult 
 Nv = size(alpha_cBar,1);   % # vehicles (comms channels)
 
@@ -140,7 +147,7 @@ switch system
         
         % cov... uncertain position but better-known velocity (closer to zero)
         P1 = [25,0;0,9];     
-        covPriorAdj = 0;    % always (for now...)
+        %covPriorAdj = 0;    % always (for now...)
         
     case 'SCALAR'
         
@@ -196,10 +203,6 @@ for k = 1:Ns
     alpha_a(:,k) = (sign(rand(Nv,1) - (1-(alpha_aBar)))*0.5 + 0.5);
 end
 
-% hardcoded sequences for consistent debugging
-%alpha_c(:,1:11) = [1 1 0 0 1 1 0 1 0 0 1];
-%alpha_m(:,1:11) =  [1 1 1 0 1 1 0 0 0 1 1];
-
 [Pi_c,Pi_m,Pi_a,tac,Ts] = createSchedule(sched,Nv,Ns,tc);
 
 if(strfind(sched,'piggyback'))
@@ -210,8 +213,12 @@ Np = NpMult*Ts;
 
 %% call sim fcn
 
+% hardcoded sequences for consistent debugging
+%alpha_c(:,1:11) = [1 1 0 0 1 1 0 1 0 0 1];
+%alpha_m(:,1:11) =  [1 1 1 0 1 1 0 0 0 1 1];
+
 % hack to overwrite covPriorAdj and rerun with same everything else
-covPriorAdj = 0;
+%covPriorAdj = 0;
 
 % (pull-out run-specific parameters for re-running?)
 
