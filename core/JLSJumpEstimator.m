@@ -1,9 +1,9 @@
 function [D_cHat,alpha_cHat,D_a,KFstart,tNoACK,gotACK] = ...
-    JLSJumpEstimator(D_cHat,Pi_c,D_a,alpha_c,alpha_cHat,Pi_a,...
+    JLSJumpEstimator(D_cHat,Pi_c,D_a,alpha_c,alpha_cHat,Pi_a,Ts,...
     alpha_a,t,tm,tc,ta,tac,Nu,Np,tNoACK,nACKHistory,printDebug)
 % Jump estimator and prep for (lossy,delayed) KF
 % [D_cHat,alpha_cHat,D_a,KFstart,tNoACK,gotACK] = ...
-%    JLSJumpEstimator(D_cHat,Pi_c,D_a,alpha_c,alpha_cHat,Pi_a,...
+%    JLSJumpEstimator(D_cHat,Pi_c,D_a,alpha_c,alpha_cHat,Pi_a,Ts,...
 %    alpha_a,t,tm,tc,ta,tac,Nu,Np,tNoACK,nACKHistory,printDebug)
 % Updates D_cHat based on delayed ACKs
 % Determines time that ACK'd buffer starts, outputs KFstart
@@ -126,8 +126,8 @@ if( (t-ta-1)>0 )
     nL = 10;
     
     % some checks for the end of the mission 
-    if(t-ta+nL>length(tNoACK))
-        maxadd = length(tNoACK);
+    if(t-ta+nL>size(tNoACK,2))
+        maxadd = size(tNoACK,2);
     else
         maxadd = t-ta+nL;
     end
@@ -139,23 +139,40 @@ if( (t-ta-1)>0 )
             tNoACK(i,t-ta) = 0;
             
             % zero past counters based on history
-            
             tBackup = t-(nACKHistory-1)-ta;   % (nACKHistory=1: just t-ta)
-            %tBackup = t-nACKHistory-ta;   % (OLD/WRONG)
-            
             if(tBackup<1)
                 tBackup = 1;
             end
+            
+            % ADD LOOKAHEAD OF ZEROS DUE TO SCHEDULED BUFFER
+            tFwd = t-ta+(Ts-1)
+            tNoACK(i,tBackup:tFwd) = 0;
+            tNoACK(i,tFwd+1:maxadd) = lookahead(1:(maxadd-tFwd));
+            
+            % OLD - doesn't take advantage of scheduling
+            %{
             tNoACK(i,tBackup:t-ta) = 0;
-            
-            % increment future, starting at 1
+            % increment future, starting at 1            
             tNoACK(i,(t-ta+1):maxadd) = lookahead;
-                        
+            %}          
+            
         else
+
+            % works without schedules, resets wrong when considering schedules
+            %startVal = tNoACK(i,t-ta-1);
+            %tNoACK(i,(t-ta):maxadd-1) = startVal + lookahead;
             
-            startVal = tNoACK(i,t-ta-1);
-            tNoACK(i,(t-ta):maxadd-1) = startVal + lookahead;
+            %for i = 1:nACKs
+            nonzeroInds = find(tNoACK(i,:));
+            nonzeroInds = nonzeroInds(nonzeroInds>1)-1;
+            nonzeroInds = nonzeroInds(nonzeroInds<size(tNoACK,2));
+            new_nonzeroInds = nonzeroInds+1;
+            tNoACK(i,new_nonzeroInds) = tNoACK(i,nonzeroInds);
+            %end
             
+            %startVal = tNoACK(i,t-ta-1);
+            %tNoACK(i,(t-ta):maxadd-1) = startVal + lookahead;
+        
         end
     end
 end

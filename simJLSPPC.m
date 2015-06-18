@@ -1,6 +1,6 @@
 function [results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tac,...
-    alpha_cBar,Pi_c,Pi_m,Pi_a,umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,...
-    w,v,alpha_c,alpha_m,alpha_a,covPriorAdj,nACKHistory)
+    alpha_cBar,Pi_c,Pi_m,Pi_a,Ts,umax,umin,codebook,Xmax,Xmin,xIC,P1,...
+    xHat1,w,v,alpha_c,alpha_m,alpha_a,covPriorAdj,nACKHistory)
 % runs simulation of MJLS/scheduled PPC
 
 % currently restricts to time-invariant constraint input
@@ -35,7 +35,7 @@ Ny = NY/Nv;
 
 % initialize tNoACK to zeros (no ACK for 'step 0')
 tNoACK = zeros(Nv,Ns);
-tNoACK(:,1) = ones(Nv,1);
+%tNoACK(:,1) = ones(Nv,1);
 
 % tNoACK *AS KNOWN EACH STEP*
 tNoACKSave = cell(Ns);
@@ -120,7 +120,7 @@ for t = (tm+1):(Ns-1)
     % updates tNoACK(t-ta) and history based on ACKs RX'd now
     % also increments a lookahead of tNoACK(t-ta+1 --> future)
     [D_cHat,alphaHat,D_a,KFstart,tNoACK,~] = JLSJumpEstimator(D_cHat,...
-        Pi_c,D_a,alpha_c,alphaHat,Pi_a,alpha_a,t,tm,tc,ta,tac,...
+        Pi_c,D_a,alpha_c,alphaHat,Pi_a,Ts,alpha_a,t,tm,tc,ta,tac,...
         Nu,Np,tNoACK,nACKHistory,printDebug);
     tNoACKSave{t} = tNoACK;
     

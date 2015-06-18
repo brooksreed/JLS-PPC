@@ -73,7 +73,7 @@ ta = 1; % ACK delay
 % ACK SETTINGS
 % # ACK Histories sent (makes most sense to be multiple of schedule length)
 % For 'SINGLE ACK': sys nACKHistory = Ts (schedule length)
-nACKHistory = 3;
+nACKHistory = 4;
 % adjustment to covariance priors due to no ACKs/control losses:
 covPriorAdj = 1;
 
@@ -129,10 +129,10 @@ end
                         % one missed, 2 missed
 
 % with SISO4
-% Pi_c          =  [1 0 0 0 1 0 0 0 1 0 0 0];
+% Pi_c          =  [1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0];
 % Pi_m          =  [0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 1];
 alpha_m(:,1:18) =  [0 0 1 0 0 0 1 0 0 0 0 0 0 0 1 0 0 1];
-                        % one missed, 2 missed                        
+                                    % one missed                     
 if(strfind(sched,'piggyback'))
     % ACK piggybacked to measurement
     alpha_a = alpha_m;   % overwrite
@@ -146,8 +146,8 @@ end
 % (pull-out run-specific parameters for re-running?)
 
 [r] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tac,...
-    alpha_cBar,Pi_c,Pi_m,Pi_a,umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,...
-    w,v,alpha_c,alpha_m,alpha_a,covPriorAdj,nACKHistory);
+    alpha_cBar,Pi_c,Pi_m,Pi_a,Ts,umax,umin,codebook,Xmax,Xmin,xIC,P1,...
+    xHat1,w,v,alpha_c,alpha_m,alpha_a,covPriorAdj,nACKHistory);
 
 r.sys.sched = sched;
 r.sys.system =system;
