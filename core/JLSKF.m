@@ -98,8 +98,6 @@ if( covPriorAdj && (max(tNoACK)>0) )
     else
         
         % single-step: Pstar
-        disp('USING MIMO PSTAR')
-        % works for MIMO
         
         % off diagonal elements
         EAZA = diag(alpha_cBar)*dU(:,1)*dU(:,1)'*diag(alpha_cBar);   
@@ -111,7 +109,10 @@ if( covPriorAdj && (max(tNoACK)>0) )
         Pstar = Bu*(EAZA - diag(alpha_cBar)*dU(:,1)*dU(:,1)'*...
             diag(alpha_cBar))*Bu';
         
-        Ppre = Ppre0+Pstar
+        Ppre = Ppre0+Pstar;
+        fprintf('\nt=%d, KF tKF=%d, MIMO P*: \n',t,tKF)
+        disp(Pstar)
+
         
         %{
         % covariance prior: scale control by alphabar -- diagonal matrix

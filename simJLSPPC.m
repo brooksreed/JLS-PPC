@@ -37,6 +37,9 @@ Ny = NY/Nv;
 tNoACK = zeros(Nv,Ns);
 tNoACK(:,1) = ones(Nv,1);
 
+% tNoACK *AS KNOWN EACH STEP*
+tNoACKSave = cell(Ns);
+
 Umax = repmat(umax,1,Ns+Np);
 Umin = repmat(umin,1,Ns+Np);
 
@@ -116,12 +119,13 @@ for t = (tm+1):(Ns-1)
     % uses tNoACK(t-ta-1) to determine how far back to update
     % updates tNoACK(t-ta) and history based on ACKs RX'd now
     % also increments a lookahead of tNoACK(t-ta+1 --> future)
-    [D_cHat,alphaHat,D_a,KFstart,tNoACK] = JLSJumpEstimator(D_cHat,...
+    [D_cHat,alphaHat,D_a,KFstart,tNoACK,~] = JLSJumpEstimator(D_cHat,...
         Pi_c,D_a,alpha_c,alphaHat,Pi_a,alpha_a,t,tm,tc,ta,tac,...
         Nu,Np,tNoACK,nACKHistory,printDebug);
+    tNoACKSave{t-ta} = tNoACK;
     
     if(printDebug)
-        %disp(tNoACK)
+        disp(tNoACK)
     end
     
     %%%%%%%%%%%%%%%
@@ -141,42 +145,43 @@ for t = (tm+1):(Ns-1)
     end
     
     % run KF from KFstart up until time of recent measurement
-    for td = KFstart:(t-tm)
+    for tKF = KFstart:(t-tm)
         
         if(covPriorAdj)
-            
-            % determine appropriate tNoACK for specific filter step
-            tNoACK_KF = zeros(1,Nv);
-            for i = 1:Nv
-                if(td-1-tac(i)>0)
-                    tNoACK_KF(i) = tNoACK(i,td+tac(i)-1);
+                        
+            % determine tNoACK vector for specific filter step
+            if(Nv==1)
+                if(tKF-1-tac>0)
+                    tNoACK_KF = tNoACK(i,tKF+tac-1);
+                else
+                    tNoACK_KF = 1;
                 end
-            end
+            else
+                
+%                 tNoACK_KF = zeros(1,Nv);
+%                 for i = 1:Nv
+%                     if(td-1-tac(i)>0)
+%                         tNoACK_KF(i) = tNoACK(i,td+tac(i)-1);
+%                     end
+%                 end
             
-            % constrain to ACK history length if needed
-            % (modify for vector nACKHistory?)
-            for i = 1:Nv
-            if(tNoACK_KF(i)>nACKHistory)
-                tNoACK_KF(i) = nACKHistory;
-                if(printDebug)
-                    disp('truncating ACK history')
-                end
-            end
+                % ambiguity: ACKs don't ACK all channels...
+                % which P*, P**, etc. to use?  
+                
+                % for now, use Pstar each step? 
+                % (only 1-step formulated anyway)
+                % (artificially constrain dU to zero for ACK'd channels?)
+                tNoACK_KF = 1;
+                
             end
             
             % prepare control options for use in cov. prior adj.
-            
-            
-            % IS USING max(tNoACK_KF) CORRECT HERE? 
-            
-            
-            
-            UOptions = zeros(NU,max(tNoACK_KF));
-            for k = 1:max(tNoACK_KF)
-                if(td-k<1)
+            UOptions = zeros(NU,tNoACK_KF);
+            for k = 1:tNoACK_KF
+                if(tKF-k<1)
                     bTMP = zeros(Nu*Np*Nv,1);
                 else
-                    bTMP = bNoLoss(:,td-k);
+                    bTMP = bNoLoss(:,tKF-k);
                 end
                 UOptions(:,k) = E*M^k*bTMP;
             end
@@ -188,7 +193,7 @@ for t = (tm+1):(Ns-1)
             
         end
         
-        if(td<=1)
+        if(tKF<=1)
             AKF = eye(size(A));
             DKFh = makeD_c(zeros(Nv,1),zeros(Nv,1),Nu,Np);
             XhIn = [xHat1;zeros(Nu*Np*Nv,1)];
@@ -198,29 +203,36 @@ for t = (tm+1):(Ns-1)
             SIn = D_m(:,:,1);
         else
             AKF = A;
-            DKFh = D_cHat(:,:,td-1);
-            XhIn = Xh(:,td-1);
-            Pin = P(:,:,td-1);
-            Uin = U(:,td-1);
-            yIn = yh(:,td);
-            SIn = D_m(:,:,td);
+            DKFh = D_cHat(:,:,tKF-1);
+            XhIn = Xh(:,tKF-1);
+            Pin = P(:,:,tKF-1);
+            Uin = U(:,tKF-1);
+            yIn = yh(:,tKF);
+            SIn = D_m(:,:,tKF);
         end
         
         % Xh(:,t-tm): xHat_{t-tm|t-tm},bHat_{t-tm-1}
-        [Xh(:,td),P(:,:,td)] = JLSKF(XhIn,Pin,yIn,Uin,DKFh,...
+        [Xh(:,tKF),P(:,:,tKF)] = JLSKF(XhIn,Pin,yIn,Uin,DKFh,...
             Nx,Nv,Nu,Np,SIn,AKF,Bu,E,M,C,W,V,...
-            t,td,tNoACK_KF,covPriorAdj,UOptions,alpha_cBar);
+            t,tKF,tNoACK_KF,covPriorAdj,UOptions,alpha_cBar);
         
         if(printDebug)
             if(covPriorAdj)
-                for i = 1:Nv
-                    fprintf('\nt=%d, KF td=%d, tNoACK_KF(%d)=%d\n',...
-                        t,td,td+tac(i)-1,tNoACK_KF(i))
+                if(Nv==1)
+                    fprintf('\nt=%d, KF tKF=%d, tNoACK_KF(%d)=%d\n',...
+                        t,tKF,tKF+tac-1,tNoACK_KF)
+                else
+                    %   fprintf('\nt=%d, KF td=%d, tNoACK_KF(%d)=%d\n',...
+                    %      t,td,td+tac(i)-1,tNoACK_KF(i))
+                    % (add in once resolve ambiguity)
                 end
             end
             if(size(A,1)==1)
                 % only print estimate for scalar sys
-                fprintf('Xh(:,1:%d)=\n',td);disp(Xh(:,1:td)')
+                % (ADD A WINDOW?)
+                dispStart = tKF-5;
+                if(dispStart<1);dispStart=1;end
+                fprintf('Xh(:,%d:%d)=\n',dispStart,tKF);disp(Xh(:,dispStart:tKF)')
             end
         end
         
@@ -346,6 +358,7 @@ results.U = U;
 results.uNoLoss = uNoLoss;
 results.bNoLoss = bNoLoss;
 results.tNoACK = tNoACK;
+results.tNoACKSave = tNoACKSave;
 
 results.Xh = Xh;
 results.P = P;

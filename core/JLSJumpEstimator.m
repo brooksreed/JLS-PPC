@@ -1,10 +1,10 @@
-function [D_cHat,alpha_cHat,D_a,KFstart,tNoACK] = JLSJumpEstimator(...
-    D_cHat,Pi_c,D_a,alpha_c,alpha_cHat,Pi_a,alpha_a,t,tm,tc,ta,tac,...
-    Nu,Np,tNoACK,nACKHistory,printDebug)
+function [D_cHat,alpha_cHat,D_a,KFstart,tNoACK,gotACK] = ...
+    JLSJumpEstimator(D_cHat,Pi_c,D_a,alpha_c,alpha_cHat,Pi_a,...
+    alpha_a,t,tm,tc,ta,tac,Nu,Np,tNoACK,nACKHistory,printDebug)
 % Jump estimator and prep for (lossy,delayed) KF
-% [D_cHat,alpha_cHat,D_a,KFstart,tNoACK] = JLSJumpEstimator(...
-%    D_cHat,Pi_c,D_a,alpha_c,alpha_cHat,Pi_a,alpha_a,t,tm,tc,ta,tac,...
-%    Nu,Np,tNoACK,nACKHistory,printDebug)
+% [D_cHat,alpha_cHat,D_a,KFstart,tNoACK,gotACK] = ...
+%    JLSJumpEstimator(D_cHat,Pi_c,D_a,alpha_c,alpha_cHat,Pi_a,...
+%    alpha_a,t,tm,tc,ta,tac,Nu,Np,tNoACK,nACKHistory,printDebug)
 % Updates D_cHat based on delayed ACKs
 % Determines time that ACK'd buffer starts, outputs KFstart
 %
@@ -16,15 +16,12 @@ function [D_cHat,alpha_cHat,D_a,KFstart,tNoACK] = JLSJumpEstimator(...
 % v1.1 6/16/2015
 
 % TO DO: 
-% refactor for speed/efficiency?
 % improve help @ top...
-% try-catch on Dhat -- due to negative index.  Specific check? 
 
 % Algorithm will back up as far as it can towards the most recent time of
 % an ACK, using ACK histories.  
 % It does not back up extra far (does not use all ACK history if not
 % needed).  
-
 % tNoACK(t-ta) resets to zero if ACK received at time t 
 
 nACKs = size(tNoACK,1);
@@ -35,11 +32,21 @@ if(t-ta-1>0)
 else
     tNoACKAlg = zeros(nACKs);
 end
+
 % limit "lookback" to the length of the ACK history sent
 for i = 1:nACKs
-    if(tNoACKAlg(i) > nACKHistory)
-        tNoACKAlg(i) = nACKHistory;
+    
+    % (THINK THIS IS WRONG - BACKS UP TOO FAR.  FIXES BUG AT ACK HISTORY)
+    %if(tNoACKAlg(i) > nACKHistory)
+    %   tNoACKAlg(i) = nACKHistory;
+    %end
+    
+    
+    % (POSSIBLE FIX)
+    if(tNoACKAlg(i) >= nACKHistory)
+        tNoACKAlg(i) = nACKHistory-1;
     end
+    
 end
 
 % determine ACKs available at this step
@@ -58,12 +65,16 @@ checkStart = (t-ta-max(tac)>tc);
 if( ~isempty(aInds) && checkStart )
     
     % for each ACK channel
-    min_tACK = zeros(size(aInds));max_tACK=min_tACK;
+    max_tACK = zeros(size(aInds));min_tACK = NaN*zeros(size(aInds));
     tACK = cell(1,length(aInds));
     for i = aInds
         % find time range for new ACKs
         % (furthest back in time ACK history will be useful)
         tACK{i} = t-ta-tac(i)-tNoACKAlg(i):t-ta-tac(i);
+        
+        % constrain tNoACKAlg to be nACKHistory-1?
+        % or increment left side +1
+        
         tACK{i} = tACK{i}(tACK{i}>tc);
         min_tACK(i) = min(tACK{i});
         max_tACK(i) = max(tACK{i});
@@ -82,37 +93,10 @@ if( ~isempty(aInds) && checkStart )
     backupStart = min(min_tACK);
     backupEnd = max(max_tACK);
     
-    
-    
-    % (HACK -- SHOULDN'T THIS BE TAKEN CARE OF ABOVE...?)
-    if(backupStart<=tc)
-        backupStart = tc+1;
-    end
-    
-    
-    
-    
     % update Dhat using alphahat
     for tprime = backupStart:backupEnd
-        try
-            D_cHat(:,:,tprime) = makeD_c(Pi_c(:,tprime-tc),...
-                alpha_cHat(:,tprime-tc),Nu,Np);
-        catch
-            
-            
-            
-            
-            
-            
-            % THIS IS GHETTO - BETTER ERROR CHECKING FOR (-) ARGS
-            disp('warning skipping D_cHat update')
-            
-            
-            
-            
-            
-            
-        end
+        D_cHat(:,:,tprime) = makeD_c(Pi_c(:,tprime-tc),...
+            alpha_cHat(:,tprime-tc),Nu,Np);
     end
     
     % KFstart is the oldest (a posteriori) step of backup-rerun
@@ -156,7 +140,11 @@ if( (t-ta-1)>0 )
             tNoACK(i,t-ta) = 0;
             
             % zero past counters based on history
-            tBackup = t-nACKHistory-ta;
+            
+            tBackup = t-(nACKHistory-1)-ta;   % (nACKHistory=1: just t-ta)
+            %tBackup = t-nACKHistory-ta;   % (OLD/WRONG)
+            
+            
             if(tBackup<1)
                 tBackup = 1;
             end
@@ -176,10 +164,10 @@ end
 
 if(printDebug && (t-ta>1) )
     for i = 1:nACKs
-        fprintf('\nt=%d, JE tNoACK(t-ta)=%d, tNoACK(t)=%d\n',t,tNoACK(i,t-ta),tNoACK(i,t))
+        fprintf('\nt=%d, JE tNoACK(t-ta)=%d, tNoACK^%d(t)=%d\n',t,tNoACK(i,t-ta),i,tNoACK(i,t))
     end
     if(exist('backupStart','var'))
-        fprintf('    JE furthest back posterior estimate: t=%d\n',backupStart)
+        fprintf('     JE furthest back posterior estimate: t=%d\n',backupStart)
     end
 end
 
