@@ -23,7 +23,6 @@ function [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
 
 % TO DO: 
 % more Pstars for SISO
-% add P* for MIMO
 % (need to load-in "lookup table")
 % add in printDebug
 
@@ -97,16 +96,20 @@ if( covPriorAdj && (max(tNoACK)>0) )
         Ppre = Ppre0+sum(Pstar,3);
         
     else
-        %disp('WARNING - cov. prior adjust not formulated for multivar. systems')
         
-        %
         % single-step: Pstar
+        disp('USING MIMO PSTAR')
         % works for MIMO
-        EAZA = diag(alpha_cBar)*dU(:,1)*dU(:,1)'*diag(alpha_cBar);   % off diagonal elements
-        dum = diag(alpha_cBar)*dU(:,1)*dU(:,1)';     % replace diagonal elements
+        
+        % off diagonal elements
+        EAZA = diag(alpha_cBar)*dU(:,1)*dU(:,1)'*diag(alpha_cBar);   
+        
+        % replace diagonal elements
+        dum = diag(alpha_cBar)*dU(:,1)*dU(:,1)';     
         for i = 1:Nu; EAZA(i,i) = dum(i,i) ; end;
         
-        Pstar = Bu*(EAZA - diag(alpha_cBar)*dU(:,1)*dU(:,1)'*diag(alpha_cBar))*Bu';
+        Pstar = Bu*(EAZA - diag(alpha_cBar)*dU(:,1)*dU(:,1)'*...
+            diag(alpha_cBar))*Bu';
         
         Ppre = Ppre0+Pstar
         
