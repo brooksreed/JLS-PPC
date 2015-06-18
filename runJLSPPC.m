@@ -48,7 +48,7 @@ system = 'SCALAR';
 % 'SISO2' - [1 0], [0 1] for pi, xi
 % 'SISO4' - [1 0 0 0], [0 0 1 0] for pi, xi 
 
-%sched = 'SISO4_piggyback';
+sched = 'SISO4_piggyback';
 %sched = 'SISO4_noACK';
 
 %sched = 'SISO2_noACK';
@@ -56,7 +56,7 @@ system = 'SCALAR';
 
 %sched = 'SISO2ALLCONTROL_noACK';
 %sched = 'SISO2ALLCONTROL_piggyback';
-sched = 'SISOALL_piggyback';
+%sched = 'SISOALL_piggyback';
 %sched = 'SISOALL_noACK';
 
 % 'MIMO' options: MX, IL
@@ -66,8 +66,8 @@ sched = 'SISOALL_piggyback';
 %sched = 'IL_noACK';
 
 % DELAYS
-tm = 1; % meas delay
 tc = 1; % control delay
+tm = 1; % meas delay (Also ACK delay with piggyback unless overwritten)
 ta = 1; % ACK delay
 
 % ACK SETTINGS
@@ -115,10 +115,24 @@ end
 % (IF WANT TO DEBUG CONTROLLER - INIT ESTIMATOR PERFECTLY)
 % xHat1 = xIC;P1 = 1*eye(2);
 
-% hardcoded sequences for consistent debugging
-%alpha_c(:,1:11) = [1 1 0 0 1 1 0 1 0 0 1];
-alpha_m(:,1:15) =  [1 1 1 0 1 1 0 0 1 1 0 0 0 1 1];
+% hardcode ta
+%ta = 2;disp('OVERWRITING ta')
 
+% hardcoded sequences for consistent debugging with SISOALL
+%alpha_c(:,1:11) = [1 1 0 0 1 1 0 1 0 0 1];
+%alpha_m(:,1:15) =  [1 1 1 0 1 1 0 0 1 1 0 0 0 1 1];
+
+% with SISO2
+% Pi_c          =  [1 0 1 0 1 0 1 0 1 0 1 0];
+% Pi_m          =  [0 1 0 1 0 1 0 1 0 1 0 1];
+%alpha_m(:,1:15) =  [0 1 0 0 0 1 0 0 0 0 0 1 0 1 0];
+                        % one missed, 2 missed
+
+% with SISO4
+% Pi_c          =  [1 0 0 0 1 0 0 0 1 0 0 0];
+% Pi_m          =  [0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 1];
+alpha_m(:,1:18) =  [0 0 1 0 0 0 1 0 0 0 0 0 0 0 1 0 0 1];
+                        % one missed, 2 missed                        
 if(strfind(sched,'piggyback'))
     % ACK piggybacked to measurement
     alpha_a = alpha_m;   % overwrite

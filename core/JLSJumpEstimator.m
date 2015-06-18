@@ -41,7 +41,6 @@ for i = 1:nACKs
     %   tNoACKAlg(i) = nACKHistory;
     %end
     
-    
     % (POSSIBLE FIX)
     if(tNoACKAlg(i) >= nACKHistory)
         tNoACKAlg(i) = nACKHistory-1;
@@ -143,7 +142,6 @@ if( (t-ta-1)>0 )
             
             tBackup = t-(nACKHistory-1)-ta;   % (nACKHistory=1: just t-ta)
             %tBackup = t-nACKHistory-ta;   % (OLD/WRONG)
-            
             
             if(tBackup<1)
                 tBackup = 1;

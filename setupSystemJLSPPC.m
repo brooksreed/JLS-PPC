@@ -5,10 +5,14 @@
 
 %%%%%%%%%%%%%%%%%%
 
-% check: 
 if(strfind(sched,'piggyback'))
-    ta = tm;
+    if(ta~=tm)
+        disp('warning - resetting ta to tm')
+        ta = tm;
+    end
     alpha_aBar = alpha_mBar;
+elseif(strfind(sched,'NoACK'))
+    ta = 0;
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -100,10 +104,10 @@ end
 if( length(alpha_mBar)~=Nv )
     disp('WARNING: alpha_m, Nv mismatch')
 end
-if( ~rem(size(C,1),Nv) )
+if( rem(size(C,1),Nv) )
     disp('WARNING: Nv not into C')
 end
-if( ~rem(size(Bu,2),Nv) )
+if( rem(size(Bu,2),Nv) )
     disp('WARNING: Nv not into Bu')
 end    
     

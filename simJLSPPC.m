@@ -122,7 +122,7 @@ for t = (tm+1):(Ns-1)
     [D_cHat,alphaHat,D_a,KFstart,tNoACK,~] = JLSJumpEstimator(D_cHat,...
         Pi_c,D_a,alpha_c,alphaHat,Pi_a,alpha_a,t,tm,tc,ta,tac,...
         Nu,Np,tNoACK,nACKHistory,printDebug);
-    tNoACKSave{t-ta} = tNoACK;
+    tNoACKSave{t} = tNoACK;
     
     if(printDebug)
         disp(tNoACK)
@@ -403,6 +403,7 @@ sys.alpha_cBar = alpha_cBar;
 sys.ta = ta;
 sys.tc = tc;
 sys.tm = tm;
+sys.nACKHistory = nACKHistory;
 
 results.sys = sys;
 
