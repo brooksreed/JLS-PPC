@@ -126,8 +126,8 @@ if( (t-ta-1)>0 )
     nL = 10;
     
     % some checks for the end of the mission 
-    if(t-ta+nL>length(tNoACK))
-        maxadd = length(tNoACK);
+    if(t-ta+nL>size(tNoACK,2))
+        maxadd = size(tNoACK,2);
     else
         maxadd = t-ta+nL;
     end
@@ -139,9 +139,7 @@ if( (t-ta-1)>0 )
             tNoACK(i,t-ta) = 0;
             
             % zero past counters based on history
-            
             tBackup = t-(nACKHistory-1)-ta;   % (nACKHistory=1: just t-ta)
-            %tBackup = t-nACKHistory-ta;   % (OLD/WRONG)
             
             if(tBackup<1)
                 tBackup = 1;
@@ -165,7 +163,7 @@ if(printDebug && (t-ta>1) )
         fprintf('\nt=%d, JE tNoACK(t-ta)=%d, tNoACK^%d(t)=%d\n',t,tNoACK(i,t-ta),i,tNoACK(i,t))
     end
     if(exist('backupStart','var'))
-        fprintf('     JE furthest back posterior estimate: t=%d\n',backupStart)
+        fprintf('      JE backupStart: t=%d\n',backupStart)
     end
 end
 

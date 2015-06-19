@@ -132,7 +132,8 @@ end
 % Pi_c          =  [1 0 0 0 1 0 0 0 1 0 0 0];
 % Pi_m          =  [0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 1];
 alpha_m(:,1:18) =  [0 0 1 0 0 0 1 0 0 0 0 0 0 0 1 0 0 1];
-                        % one missed, 2 missed                        
+                        % one missed, 2 missed        
+                        
 if(strfind(sched,'piggyback'))
     % ACK piggybacked to measurement
     alpha_a = alpha_m;   % overwrite
