@@ -35,7 +35,17 @@ Ny = NY/Nv;
 
 % initialize tNoACK to zeros (no ACK for 'step 0')
 tNoACK = zeros(Nv,Ns);
-%tNoACK(:,1) = ones(Nv,1);
+
+% If initial controls unknown
+tNoACK(:,1:Ns) = 1:Ns;
+
+% after first planned control RX, unknown
+% initialize based on 2nd pi_c + tau_c ?? (need tau_ac too?)
+% tmp = find(pi_c);
+% start = tmp(2)+tc
+% tNoACK(:,start:Ns) = 1:(Ns-start);
+
+
 
 % tNoACK *AS KNOWN EACH STEP*
 tNoACKSave = cell(Ns);

@@ -48,11 +48,11 @@ system = 'SCALAR';
 % 'SISO2' - [1 0], [0 1] for pi, xi
 % 'SISO4' - [1 0 0 0], [0 0 1 0] for pi, xi 
 
-sched = 'SISO4_piggyback';
+%sched = 'SISO4_piggyback';
 %sched = 'SISO4_noACK';
 
 %sched = 'SISO2_noACK';
-%sched = 'SISO2_piggyback';
+sched = 'SISO2_piggyback';
 
 %sched = 'SISO2ALLCONTROL_noACK';
 %sched = 'SISO2ALLCONTROL_piggyback';
@@ -73,7 +73,7 @@ ta = 1; % ACK delay
 % ACK SETTINGS
 % # ACK Histories sent (makes most sense to be multiple of schedule length)
 % For 'SINGLE ACK': sys nACKHistory = Ts (schedule length)
-nACKHistory = 5;
+nACKHistory = 1;
 % adjustment to covariance priors due to no ACKs/control losses:
 covPriorAdj = 1;
 
@@ -125,14 +125,13 @@ end
 % with SISO2
 % Pi_c          =  [1 0 1 0 1 0 1 0 1 0 1 0];
 % Pi_m          =  [0 1 0 1 0 1 0 1 0 1 0 1];
-%alpha_m(:,1:15) =  [0 1 0 0 0 1 0 0 0 0 0 1 0 1 0];
+alpha_m(:,1:15) =  [0 1 0 0 0 1 0 0 0 0 0 1 0 1 0];
                         % one missed, 2 missed
 
 % with SISO4
 % Pi_c          =  [1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0];
 % Pi_m          =  [0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 1];
-alpha_m(:,1:18) =  [0 0 1 0 0 0 1 0 0 0 0 0 0 0 1 0 0 1];
-%alpha_m(:,1:18) =  [0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 1];
+%alpha_m(:,1:18) =  [0 0 1 0 0 0 1 0 0 0 0 0 0 0 1 0 0 1];
 
                                     % one missed                     
 if(strfind(sched,'piggyback'))
