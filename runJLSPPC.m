@@ -73,7 +73,7 @@ ta = 1; % ACK delay
 % ACK SETTINGS
 % # ACK Histories sent (makes most sense to be multiple of schedule length)
 % For 'SINGLE ACK': sys nACKHistory = Ts (schedule length)
-nACKHistory = 4;
+nACKHistory = 5;
 % adjustment to covariance priors due to no ACKs/control losses:
 covPriorAdj = 1;
 
@@ -132,6 +132,8 @@ end
 % Pi_c          =  [1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0];
 % Pi_m          =  [0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 1];
 alpha_m(:,1:18) =  [0 0 1 0 0 0 1 0 0 0 0 0 0 0 1 0 0 1];
+%alpha_m(:,1:18) =  [0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 1];
+
                                     % one missed                     
 if(strfind(sched,'piggyback'))
     % ACK piggybacked to measurement

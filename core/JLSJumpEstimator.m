@@ -123,7 +123,7 @@ end
 % increment tNoACK (plus lookahead)
 if( (t-ta-1)>0 )
     
-    nL = 10;
+    nL = 100;
     
     % some checks for the end of the mission 
     if(t-ta+nL>size(tNoACK,2))
@@ -138,19 +138,31 @@ if( (t-ta-1)>0 )
         if(gotACK(i))
             tNoACK(i,t-ta) = 0;
             
-            % zero past counters based on history
-            tBackup = t-(nACKHistory-1)-ta;   % (nACKHistory=1: just t-ta)
+            % determine history able to be updated based on this ACK
+            % () for clarity - (if nACKHistory=1: just t-ta)
+            tBackup = (t-ta)-(nACKHistory-1);   
             if(tBackup<1)
                 tBackup = 1;
             end
             
-            % ADD LOOKAHEAD OF ZEROS DUE TO SCHEDULED BUFFER
-            tFwd = t-ta+(Ts-1)
-            tNoACK(i,tBackup:tFwd) = 0;
+            % determine future that is known based on this ACK
+            % (due to schedule -- time until next planned ACK)
+            
+            % (note - this assumes one control/ack pair per schedule)
+            %   tau_ac implicitly used for getting ACK
+            %       fwd knowledge based entirely on Ts 
+            %       Ts into future, new ACK is expected (counter starts up)
+            tFwd = (t-ta)+(Ts-1);
+            
+            % zero counter based on ACKs received
+            tNoACK(i,tBackup:tFwd) = 0; 
+            
+            % (THIS APPEARS TO WORK - SISO4)
             tNoACK(i,tFwd+1:maxadd) = lookahead(1:(maxadd-tFwd));
             
             % OLD - doesn't take advantage of scheduling
             %{
+            % add lookeadh
             tNoACK(i,tBackup:t-ta) = 0;
             % increment future, starting at 1            
             tNoACK(i,(t-ta+1):maxadd) = lookahead;
@@ -162,6 +174,9 @@ if( (t-ta-1)>0 )
             %startVal = tNoACK(i,t-ta-1);
             %tNoACK(i,(t-ta):maxadd-1) = startVal + lookahead;
             
+            % this is a mess...and wrong
+            % DON'T NEED TO DO ANYTHING HERE... LOOKAHEAD TAKES CARE OF IT
+            %{
             %for i = 1:nACKs
             nonzeroInds = find(tNoACK(i,:));
             nonzeroInds = nonzeroInds(nonzeroInds>1)-1;
@@ -169,10 +184,8 @@ if( (t-ta-1)>0 )
             new_nonzeroInds = nonzeroInds+1;
             tNoACK(i,new_nonzeroInds) = tNoACK(i,nonzeroInds);
             %end
+            %}
             
-            %startVal = tNoACK(i,t-ta-1);
-            %tNoACK(i,(t-ta):maxadd-1) = startVal + lookahead;
-        
         end
     end
 end

@@ -99,6 +99,8 @@ if( covPriorAdj && (max(tNoACK)>0) )
         
         % single-step: Pstar
         
+        % (zero out dU manually for ACK'd channels?)
+        
         % off diagonal elements
         EAZA = diag(alpha_cBar)*dU(:,1)*dU(:,1)'*diag(alpha_cBar);   
         
@@ -112,19 +114,6 @@ if( covPriorAdj && (max(tNoACK)>0) )
         Ppre = Ppre0+Pstar;
         fprintf('\nt=%d, KF tKF=%d, MIMO P*: \n',t,tKF)
         disp(Pstar)
-
-        
-        %{
-        % covariance prior: scale control by alphabar -- diagonal matrix
-        ubuff = E1*M*Xh(Nx+1:end);    % one shift of previous buffer
-        qq = (ut - ubuff)*(ut - ubuff)' ;
-        ab = diag(alphaBar);
-        Z = ab*qq*ab ;   % off diagonal elements
-        dum = ab*qq ;
-        for i = 1:Nu; Z(i,i) = dum(i,i) ; end;
-        Padd =  Bu*(Z + qq - ab*qq - qq*ab)*Bu';
-        Ppre = Ppre + Padd;
-        %}
         
     end
 else
