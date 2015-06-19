@@ -168,19 +168,23 @@ for t = (tm+1):(Ns-1)
                 end
             else
                 
-%                 tNoACK_KF = zeros(1,Nv);
-%                 for i = 1:Nv
-%                     if(td-1-tac(i)>0)
-%                         tNoACK_KF(i) = tNoACK(i,td+tac(i)-1);
-%                     end
-%                 end
-            
+                % KEEP THIS?  OR MODIFY FOR JUST >0 OR NOT
+                %{
+                tNoACK_KF = zeros(1,Nv);
+                for i = 1:Nv
+                    if(td-1-tac(i)>0)
+                        tNoACK_KF(i) = tNoACK(i,td+tac(i)-1);
+                    end
+                end
+                %} 
+                
                 % ambiguity: ACKs don't ACK all channels...
                 % which P*, P**, etc. to use?  
-                
                 % for now, use Pstar each step? 
                 % (only 1-step formulated anyway)
                 % (artificially constrain dU to zero for ACK'd channels?)
+                % (DO THIS HERE? OR INSIDE KF?)
+                
                 tNoACK_KF = 1;
                 
             end

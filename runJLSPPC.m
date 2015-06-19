@@ -52,11 +52,11 @@ system = 'SCALAR';
 %sched = 'SISO4_noACK';
 
 %sched = 'SISO2_noACK';
-sched = 'SISO2_piggyback';
+%sched = 'SISO2_piggyback';
 
 %sched = 'SISO2ALLCONTROL_noACK';
 %sched = 'SISO2ALLCONTROL_piggyback';
-%sched = 'SISOALL_piggyback';
+sched = 'SISOALL_piggyback';
 %sched = 'SISOALL_noACK';
 
 % 'MIMO' options: MX, IL
@@ -120,12 +120,12 @@ end
 
 % hardcoded sequences for consistent debugging with SISOALL
 %alpha_c(:,1:11) = [1 1 0 0 1 1 0 1 0 0 1];
-%alpha_m(:,1:15) =  [1 1 1 0 1 1 0 0 1 1 0 0 0 1 1];
+alpha_m(:,1:15) =  [1 1 1 0 1 1 0 0 1 1 0 0 0 1 1];
 
 % with SISO2
 % Pi_c          =  [1 0 1 0 1 0 1 0 1 0 1 0];
 % Pi_m          =  [0 1 0 1 0 1 0 1 0 1 0 1];
-alpha_m(:,1:15) =  [0 1 0 0 0 1 0 0 0 0 0 1 0 1 0];
+%alpha_m(:,1:15) =  [0 1 0 0 0 1 0 0 0 0 0 1 0 1 0];
                         % one missed, 2 missed
 
 % with SISO4

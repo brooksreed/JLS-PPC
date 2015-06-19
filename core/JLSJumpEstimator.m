@@ -157,34 +157,8 @@ if( (t-ta-1)>0 )
             % zero counter based on ACKs received
             tNoACK(i,tBackup:tFwd) = 0; 
             
-            % (THIS APPEARS TO WORK - SISO4)
+            % shift lookahead according to schedule
             tNoACK(i,tFwd+1:maxadd) = lookahead(1:(maxadd-tFwd));
-            
-            % OLD - doesn't take advantage of scheduling
-            %{
-            % add lookeadh
-            tNoACK(i,tBackup:t-ta) = 0;
-            % increment future, starting at 1            
-            tNoACK(i,(t-ta+1):maxadd) = lookahead;
-            %}          
-            
-        else
-
-            % works without schedules, resets wrong when considering schedules
-            %startVal = tNoACK(i,t-ta-1);
-            %tNoACK(i,(t-ta):maxadd-1) = startVal + lookahead;
-            
-            % this is a mess...and wrong
-            % DON'T NEED TO DO ANYTHING HERE... LOOKAHEAD TAKES CARE OF IT
-            %{
-            %for i = 1:nACKs
-            nonzeroInds = find(tNoACK(i,:));
-            nonzeroInds = nonzeroInds(nonzeroInds>1)-1;
-            nonzeroInds = nonzeroInds(nonzeroInds<size(tNoACK,2));
-            new_nonzeroInds = nonzeroInds+1;
-            tNoACK(i,new_nonzeroInds) = tNoACK(i,nonzeroInds);
-            %end
-            %}
             
         end
     end
