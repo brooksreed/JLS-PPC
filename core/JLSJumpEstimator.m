@@ -34,18 +34,11 @@ else
 end
 
 % limit "lookback" to the length of the ACK history sent
+% "-1" is so that no *extra* backups done if 1 ACK sent (nACKHistory=1)
 for i = 1:nACKs
-    
-    % (THINK THIS IS WRONG - BACKS UP TOO FAR.  FIXES BUG AT ACK HISTORY)
-    %if(tNoACKAlg(i) > nACKHistory)
-    %   tNoACKAlg(i) = nACKHistory;
-    %end
-    
-    % (POSSIBLE FIX)
     if(tNoACKAlg(i) >= nACKHistory)
         tNoACKAlg(i) = nACKHistory-1;
     end
-    
 end
 
 % determine ACKs available at this step
@@ -67,6 +60,7 @@ if( ~isempty(aInds) && checkStart )
     max_tACK = zeros(size(aInds));min_tACK = NaN*zeros(size(aInds));
     tACK = cell(1,length(aInds));
     for i = aInds
+        
         % find time range for new ACKs
         % (furthest back in time ACK history will be useful)
         tACK{i} = t-ta-tac(i)-tNoACKAlg(i):t-ta-tac(i);
