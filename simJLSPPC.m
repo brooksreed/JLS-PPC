@@ -1,6 +1,6 @@
 function [results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tac,...
-    alpha_cBar,Pi_c,Pi_m,Pi_a,umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,...
-    w,v,alpha_c,alpha_m,alpha_a,covPriorAdj,nACKHistory)
+    alpha_cBar,Pi_c,Pi_m,Pi_a,Ts,umax,umin,codebook,Xmax,Xmin,xIC,P1,...
+    xHat1,w,v,alpha_c,alpha_m,alpha_a,covPriorAdj,nACKHistory)
 % runs simulation of MJLS/scheduled PPC
 
 % currently restricts to time-invariant constraint input
@@ -35,7 +35,17 @@ Ny = NY/Nv;
 
 % initialize tNoACK to zeros (no ACK for 'step 0')
 tNoACK = zeros(Nv,Ns);
-tNoACK(:,1) = ones(Nv,1);
+
+% If initial controls unknown
+tNoACK(:,1:Ns) = 1:Ns;
+
+% after first planned control RX, unknown
+% initialize based on 2nd pi_c + tau_c ?? (need tau_ac too?)
+% tmp = find(pi_c);
+% start = tmp(2)+tc
+% tNoACK(:,start:Ns) = 1:(Ns-start);
+
+
 
 % tNoACK *AS KNOWN EACH STEP*
 tNoACKSave = cell(Ns);
@@ -120,7 +130,7 @@ for t = (tm+1):(Ns-1)
     % updates tNoACK(t-ta) and history based on ACKs RX'd now
     % also increments a lookahead of tNoACK(t-ta+1 --> future)
     [D_cHat,alphaHat,D_a,KFstart,tNoACK,~] = JLSJumpEstimator(D_cHat,...
-        Pi_c,D_a,alpha_c,alphaHat,Pi_a,alpha_a,t,tm,tc,ta,tac,...
+        Pi_c,D_a,alpha_c,alphaHat,Pi_a,Ts,alpha_a,t,tm,tc,ta,tac,...
         Nu,Np,tNoACK,nACKHistory,printDebug);
     tNoACKSave{t} = tNoACK;
     
@@ -158,19 +168,23 @@ for t = (tm+1):(Ns-1)
                 end
             else
                 
-%                 tNoACK_KF = zeros(1,Nv);
-%                 for i = 1:Nv
-%                     if(td-1-tac(i)>0)
-%                         tNoACK_KF(i) = tNoACK(i,td+tac(i)-1);
-%                     end
-%                 end
-            
+                % KEEP THIS?  OR MODIFY FOR JUST >0 OR NOT
+                %{
+                tNoACK_KF = zeros(1,Nv);
+                for i = 1:Nv
+                    if(td-1-tac(i)>0)
+                        tNoACK_KF(i) = tNoACK(i,td+tac(i)-1);
+                    end
+                end
+                %} 
+                
                 % ambiguity: ACKs don't ACK all channels...
                 % which P*, P**, etc. to use?  
-                
                 % for now, use Pstar each step? 
                 % (only 1-step formulated anyway)
                 % (artificially constrain dU to zero for ACK'd channels?)
+                % (DO THIS HERE? OR INSIDE KF?)
+                
                 tNoACK_KF = 1;
                 
             end

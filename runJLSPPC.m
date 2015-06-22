@@ -157,6 +157,7 @@ if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
     
 end
 
+
 if(strfind(sched,'piggyback'))
     % ACK piggybacked to measurement
     alpha_a = alpha_m;   % overwrite
@@ -170,8 +171,8 @@ end
 % (pull-out run-specific parameters for re-running?)
 
 [r] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tac,...
-    alpha_cBar,Pi_c,Pi_m,Pi_a,umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,...
-    w,v,alpha_c,alpha_m,alpha_a,covPriorAdj,nACKHistory);
+    alpha_cBar,Pi_c,Pi_m,Pi_a,Ts,umax,umin,codebook,Xmax,Xmin,xIC,P1,...
+    xHat1,w,v,alpha_c,alpha_m,alpha_a,covPriorAdj,nACKHistory);
 
 r.sys.sched = sched;
 r.sys.system =system;

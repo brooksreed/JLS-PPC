@@ -1,9 +1,9 @@
 function [D_cHat,alpha_cHat,D_a,KFstart,tNoACK,gotACK] = ...
-    JLSJumpEstimator(D_cHat,Pi_c,D_a,alpha_c,alpha_cHat,Pi_a,...
+    JLSJumpEstimator(D_cHat,Pi_c,D_a,alpha_c,alpha_cHat,Pi_a,Ts,...
     alpha_a,t,tm,tc,ta,tac,Nu,Np,tNoACK,nACKHistory,printDebug)
 % Jump estimator and prep for (lossy,delayed) KF
 % [D_cHat,alpha_cHat,D_a,KFstart,tNoACK,gotACK] = ...
-%    JLSJumpEstimator(D_cHat,Pi_c,D_a,alpha_c,alpha_cHat,Pi_a,...
+%    JLSJumpEstimator(D_cHat,Pi_c,D_a,alpha_c,alpha_cHat,Pi_a,Ts,...
 %    alpha_a,t,tm,tc,ta,tac,Nu,Np,tNoACK,nACKHistory,printDebug)
 % Updates D_cHat based on delayed ACKs
 % Determines time that ACK'd buffer starts, outputs KFstart
@@ -34,18 +34,11 @@ else
 end
 
 % limit "lookback" to the length of the ACK history sent
+% "-1" is so that no *extra* backups done if 1 ACK sent (nACKHistory=1)
 for i = 1:nACKs
-    
-    % (THINK THIS IS WRONG - BACKS UP TOO FAR.  FIXES BUG AT ACK HISTORY)
-    %if(tNoACKAlg(i) > nACKHistory)
-    %   tNoACKAlg(i) = nACKHistory;
-    %end
-    
-    % (POSSIBLE FIX)
     if(tNoACKAlg(i) >= nACKHistory)
         tNoACKAlg(i) = nACKHistory-1;
     end
-    
 end
 
 % determine ACKs available at this step
@@ -67,6 +60,7 @@ if( ~isempty(aInds) && checkStart )
     max_tACK = zeros(size(aInds));min_tACK = NaN*zeros(size(aInds));
     tACK = cell(1,length(aInds));
     for i = aInds
+        
         % find time range for new ACKs
         % (furthest back in time ACK history will be useful)
         tACK{i} = t-ta-tac(i)-tNoACKAlg(i):t-ta-tac(i);
@@ -123,7 +117,7 @@ end
 % increment tNoACK (plus lookahead)
 if( (t-ta-1)>0 )
     
-    nL = 10;
+    nL = 100;
     
     % some checks for the end of the mission 
     if(t-ta+nL>size(tNoACK,2))
@@ -138,21 +132,27 @@ if( (t-ta-1)>0 )
         if(gotACK(i))
             tNoACK(i,t-ta) = 0;
             
-            % zero past counters based on history
-            tBackup = t-(nACKHistory-1)-ta;   % (nACKHistory=1: just t-ta)
-            
+            % determine history able to be updated based on this ACK
+            % () for clarity - (if nACKHistory=1: just t-ta)
+            tBackup = (t-ta)-(nACKHistory-1);   
             if(tBackup<1)
                 tBackup = 1;
             end
-            tNoACK(i,tBackup:t-ta) = 0;
             
-            % increment future, starting at 1
-            tNoACK(i,(t-ta+1):maxadd) = lookahead;
-                        
-        else
+            % determine future that is known based on this ACK
+            % (due to schedule -- time until next planned ACK)
             
-            startVal = tNoACK(i,t-ta-1);
-            tNoACK(i,(t-ta):maxadd-1) = startVal + lookahead;
+            % (note - this assumes one control/ack pair per schedule)
+            %   tau_ac implicitly used for getting ACK
+            %       fwd knowledge based entirely on Ts 
+            %       Ts into future, new ACK is expected (counter starts up)
+            tFwd = (t-ta)+(Ts-1);
+            
+            % zero counter based on ACKs received
+            tNoACK(i,tBackup:tFwd) = 0; 
+            
+            % shift lookahead according to schedule
+            tNoACK(i,tFwd+1:maxadd) = lookahead(1:(maxadd-tFwd));
             
         end
     end
