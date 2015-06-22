@@ -1,4 +1,7 @@
 % sets up JLSPPC system for simulations
+% 'inputs' are system, sched
+% system params are set inside here
+
 % pulls these settings outside of run script
 
 % BR, 6/18/2015
