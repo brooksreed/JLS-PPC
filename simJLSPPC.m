@@ -22,7 +22,19 @@ printDebug = 1;
 % currently always uses alphaBar state prior adjustment
 if(covPriorAdj)
     disp('COV PRIOR ADJUST ON')
+    
+    
+    % EITHER -- Load lookup table of Pstar terms
+    % (Probably preferred)
+    
+    % OR run computePstars each time? 
+    
+    
 end
+
+
+
+
 
 % initialization stuff
 Nx = size(A,1);

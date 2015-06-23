@@ -22,8 +22,9 @@ function [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
 % v1.1 6/16/2015
 
 % TO DO: 
-% more Pstars for SISO
+% more Pstars for SISO  -- AUTOMATE 
 % (need to load-in "lookup table")
+
 % add in printDebug
 
 % covariance prior (standard)
@@ -51,6 +52,15 @@ if( covPriorAdj && (max(tNoACK)>0) )
             fprintf('\nt=%d, KF tKF=%d ERROR - ACKDropped too large, using Pstar2\n',t,tKF)
             tNoACK=2;
         end
+        
+        
+        
+        % AUTOMATED COMPUTATION AND SUMMING OF TERMS BASED ON tNoACK
+        % MAY BE FASTEST TO DUMP LOOKUP TABLE OF STRINGS HERE? 
+        % USE EVAL?  ... OR SOMETHING BETTER?
+        % PROBABLY SLOW TO ACTUALLY USE SYMBOLIC VARS
+        
+        
         
         % NOTE -- uHistory are from prev. COMPUTED buffers
         % they are not necessarily shifts of the buffer estimate in Xh        
