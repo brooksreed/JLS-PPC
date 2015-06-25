@@ -1,5 +1,5 @@
 function [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
-    E,M,C,W,V,t,tKF,tNoACK,covPriorAdj,uOptions,alpha_cBar)
+    E,M,C,W,V,alpha_cBar,cv,pd)
 % [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
 %     E,M,C,W,V,t,tKF,tNoACK,covPriorAdj,uOptions,alpha_cBar)
 %
@@ -10,13 +10,18 @@ function [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
 % D_cHat: estimate of control jump variable
 % (std. system vars)
 % W, V: process, meas. noise covariances
-% uOptions: NU x tNoACK vector of alternate control actions that might be
-%   applied depending on control packet success history
 % alpha_cBar: control packet success probability
-% covPriorAdj: toggles using the adjustment
-% tNoACK: time since ACK received (for covPriorAdj)
-% t: true time at estimator when fcn is called (mostly for debugging)
-% tKF: physical time step KF is updating -- xHat(tKF|tKF) posterior
+% cv struct:  (if cv==0 or [], covPriorAdjust is not used)
+% else, cv must be a struct with the following fields:
+%   uOptions: NU x tNoACK vector of alternate control actions that might be
+%       applied depending on control packet success history
+            % Uoptions is indexed backwards
+            % Uoptions(:,1) is most recent, (:,tNoACK_KF) is furthest back
+%   tNoACK: time since ACK received (for covPriorAdj)
+%   PstarCoefficients: vector of coefficients for Pstar
+% pd struct: if(pd==0 or [], printDebug = 0)
+%   t: true time at estimator when fcn is called (mostly for debugging)
+%   tKF: physical time step KF is updating -- xHat(tKF|tKF) posterior
 
 % v1.0 6/13/2015
 % v1.1 6/16/2015
@@ -26,6 +31,27 @@ function [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
 % (need to load-in "lookup table")
 
 % add in printDebug
+
+if(isstruct(cv))
+    
+    covPriorAdj = 1;
+    uOptions = cv.uOptions;
+    tNoACK = cv.tNoACK;
+    if(size(Bu,2)==1)
+        PstarCoefficients = cv.PstarCoefficients;
+        nStars = length(PstarCoefficients);
+    end
+    
+elseif(isempty(cv) || cv==0)
+    covPriorAdj = 0;
+end
+
+if(isstruct(pd))
+    t = pd.t; tKF = pd.tKF;
+    printDebug=1;
+elseif(isempty(pd) || pd==0)
+    printDebug = 0;
+end
 
 % covariance prior (standard)
 Ppre0 = A*P*A' + W ; %P_{t+1|t}
@@ -39,6 +65,7 @@ if( covPriorAdj && (max(tNoACK)>0) )
     for i = 1:max(tNoACK)
         dU(:,i) = (ut - uOptions(:,i));
     end
+    
     %{
     fprintf('\nt=%d, KF: ut=',t)
     disp(ut)
@@ -48,58 +75,83 @@ if( covPriorAdj && (max(tNoACK)>0) )
         
     % Single input systems
     if(size(Bu,2)==1)
-        if(tNoACK>2)
-            fprintf('\nt=%d, KF tKF=%d ERROR - ACKDropped too large, using Pstar2\n',t,tKF)
-            tNoACK=2;
+        
+        % tNoACK is a scalar
+        if(length(tNoACK)>1)
+            disp('ERROR: tNoACK is vector, expected scalar')
         end
         
-        
-        
-        % AUTOMATED COMPUTATION AND SUMMING OF TERMS BASED ON tNoACK
-        % MAY BE FASTEST TO DUMP LOOKUP TABLE OF STRINGS HERE? 
-        % USE EVAL?  ... OR SOMETHING BETTER?
-        % PROBABLY SLOW TO ACTUALLY USE SYMBOLIC VARS
-        
-        
+        if(tNoACK>nStars)
+            if(printDebug)
+                fprintf('\nt=%d, KF tKF=%d ERROR: tNoACK too large, using Pstar%d\n',...
+                    t,tKF,nStars)
+            end
+            tNoACK=nStars;
+        end
         
         % NOTE -- uHistory are from prev. COMPUTED buffers
         % they are not necessarily shifts of the buffer estimate in Xh        
-        Pstar = zeros(size(P,1),size(P,2),10);
+        Pstar = zeros(size(P,1),size(P,2),tNoACK);
+        
         if(tNoACK==1)
             
+            % 1-step term is 'special'
             Pstar(:,:,1) = (alpha_cBar*(1-alpha_cBar))*Bu*dU(:,1)*...
                 dU(:,1)'*Bu';
-            %Pstar2 = 0;
-            if(size(Pstar,1)==1)
-                fprintf('\nt=%d, KF tKF=%d, P* = %f \n',t, tKF,...
-                    squeeze(Pstar(:,:,1)))
-            else
-                fprintf('\nt=%d, KF tKF=%d, P* = \n',t, tKF)
-                disp(squeeze(Pstar(:,:,1)))
+            
+            if(printDebug)
+                if(size(Pstar,1)==1)
+                    fprintf('\nt=%d, KF tKF=%d, P* = %f \n',t, tKF,...
+                        squeeze(Pstar(:,:,1)))
+                else
+                    fprintf('\nt=%d, KF tKF=%d, P* = \n',t, tKF)
+                    disp(squeeze(Pstar(:,:,1)))
+                end
             end
             
-        elseif(tNoACK==2)
+        elseif(tNoACK>1)
+                   
+        
+%        elseif(tNoACK==2)
+%            % old hardcoded P**
+%             % uses diff with 1-step prev. plan
+%             Pstar(:,:,1) = (- alpha_cBar^4 + 2*alpha_cBar^3 - ...
+%                 2*alpha_cBar^2 + alpha_cBar)*Bu*dU(:,2)*dU(:,2)'*Bu';
+%             % uses diff with 2-step prev. plan (earliest)
+%             Pstar(:,:,2) = (- alpha_cBar^4 + 4*alpha_cBar^3 - ...
+%                 5*alpha_cBar^2 + 2*alpha_cBar)*Bu*dU(:,1)*dU(:,1)'*Bu';
+%             if(size(Pstar,1)==1)
+%                 fprintf('\nt=%d, KF tKF=%d, P**(1) = %f, P**(2) = %f \n',...
+%                     t,tKF,squeeze(Pstar(:,:,1)),squeeze(Pstar(:,:,2)))
+%             else
+%                 fprintf('\nt=%d, KF tKF=%d, P**(1) =    , P**(2) =     \n',...
+%                     t,tKF)
+%                 disp([squeeze(Pstar(:,:,1)),squeeze(Pstar(:,:,2))])
+%             end
             
-            % uses diff with 1-step prev. plan
-            Pstar(:,:,1) = (- alpha_cBar^4 + 2*alpha_cBar^3 - ...
-                2*alpha_cBar^2 + alpha_cBar)*Bu*dU(:,2)*dU(:,2)'*Bu';
-            % uses diff with 2-step prev. plan (earliest)
-            Pstar(:,:,2) = (- alpha_cBar^4 + 4*alpha_cBar^3 - ...
-                5*alpha_cBar^2 + 2*alpha_cBar)*Bu*dU(:,1)*dU(:,1)'*Bu';
-            if(size(Pstar,1)==1)
-                fprintf('\nt=%d, KF tKF=%d, P**(1) = %f, P**(2) = %f \n',...
-                    t,tKF,squeeze(Pstar(:,:,1)),squeeze(Pstar(:,:,2)))
-            else
-                fprintf('\nt=%d, KF tKF=%d, P**(1) =    , P**(2) =     \n',...
-                    t,tKF)
-                disp([squeeze(Pstar(:,:,1)),squeeze(Pstar(:,:,2))])
+            for j = 1:tNoACK
+                Pstar(:,:,j) = PstarCoefficients(j)*Bu*dU(:,j)*dU(:,j)'*Bu';
             end
 
-        elseif(tNoACK>2)
+
+            % uses diff with 1-step prev. plan
+            %Pstar(:,:,1) = (- alpha_cBar^4 + 2*alpha_cBar^3 - ...
+            %    2*alpha_cBar^2 + alpha_cBar)*Bu*dU(:,2)*dU(:,2)'*Bu';
+            % uses diff with 2-step prev. plan (earliest)
+            %Pstar(:,:,2) = (- alpha_cBar^4 + 4*alpha_cBar^3 - ...
+            %    5*alpha_cBar^2 + 2*alpha_cBar)*Bu*dU(:,1)*dU(:,1)'*Bu';
             
-            % (fill in with more Pstars...)
-            %Pstar1 = 0.00111; Pstar2 = 0.00222; Pstar3 = 0.00333; 
-            disp('(Pstar>2)')
+            
+            if(printDebug)
+                if(size(Pstar,1)==1)
+                    fprintf('\nt=%d, KF tKF=%d, P**(1) = %f, P**(2) = %f \n',...
+                        t,tKF,squeeze(Pstar(:,:,1)),squeeze(Pstar(:,:,2)))
+                else
+                    fprintf('\nt=%d, KF tKF=%d, P**(1) =    , P**(2) =     \n',...
+                        t,tKF)
+                    disp([squeeze(Pstar(:,:,1)),squeeze(Pstar(:,:,2))])
+                end
+            end
             
         end
         

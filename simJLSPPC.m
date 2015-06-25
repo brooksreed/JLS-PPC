@@ -19,23 +19,6 @@ function [results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tac,...
 
 printDebug = 1;
 
-% currently always uses alphaBar state prior adjustment
-if(covPriorAdj)
-    disp('COV PRIOR ADJUST ON')
-    
-    
-    % EITHER -- Load lookup table of Pstar terms
-    % (Probably preferred)
-    
-    % OR run computePstars each time? 
-    
-    
-end
-
-
-
-
-
 % initialization stuff
 Nx = size(A,1);
 Nv = length(alpha_cBar);
@@ -57,10 +40,26 @@ tNoACK(:,1:Ns) = 1:Ns;
 % start = tmp(2)+tc
 % tNoACK(:,start:Ns) = 1:(Ns-start);
 
-
-
 % tNoACK *AS KNOWN EACH STEP*
 tNoACKSave = cell(Ns);
+
+if(covPriorAdj)
+    disp('COV PRIOR ADJUST ON')
+    % compute Pstar terms for specific alpha_cBar
+    if(length(alpha_cBar)==1)
+        
+        % possibly load in the symbolic lookup table - would be slightly
+        % faster
+        nStars = 6;
+        PstarCoefficients = computePstars(nStars,alpha_cBar);
+        
+    else
+        %
+        disp('USING MULTIVEHICLE ONE-STEP P* APPROX')
+    end
+    
+end
+
 
 Umax = repmat(umax,1,Ns+Np);
 Umin = repmat(umin,1,Ns+Np);
@@ -189,11 +188,7 @@ for t = (tm+1):(Ns-1)
                     end
                 end
                 %} 
-                
-                % ambiguity: ACKs don't ACK all channels...
-                % which P*, P**, etc. to use?  
-                % for now, use Pstar each step? 
-                % (only 1-step formulated anyway)
+
                 % (artificially constrain dU to zero for ACK'd channels?)
                 % (DO THIS HERE? OR INSIDE KF?)
                 
@@ -202,19 +197,21 @@ for t = (tm+1):(Ns-1)
             end
             
             % prepare control options for use in cov. prior adj.
-            UOptions = zeros(NU,tNoACK_KF);
+            % Uoptions is indexed backwards
+            % Uoptions(:,1) is most recent, (:,tNoACK_KF) is furthest back
+            uOptions = zeros(NU,tNoACK_KF);
             for k = 1:tNoACK_KF
                 if(tKF-k<1)
                     bTMP = zeros(Nu*Np*Nv,1);
                 else
                     bTMP = bNoLoss(:,tKF-k);
                 end
-                UOptions(:,k) = E*M^k*bTMP;
+                uOptions(:,k) = E*M^k*bTMP;
             end
             
         else
             
-            UOptions = [];
+            uOptions = [];
             tNoACK_KF = [];
             
         end
@@ -237,10 +234,21 @@ for t = (tm+1):(Ns-1)
             SIn = D_m(:,:,tKF);
         end
         
+        if(covPriorAdj)
+            cv.uOptions = uOptions;
+            cv.tNoACK = tNoACK_KF;
+            cv.PstarCoefficients = PstarCoefficients;
+        else
+            cv=0;
+        end
+        
+        %printDebugKF=0;
+        printDebugKF.t = t;printDebugKF.tKF = tKF;
+            
         % Xh(:,t-tm): xHat_{t-tm|t-tm},bHat_{t-tm-1}
         [Xh(:,tKF),P(:,:,tKF)] = JLSKF(XhIn,Pin,yIn,Uin,DKFh,...
-            Nx,Nv,Nu,Np,SIn,AKF,Bu,E,M,C,W,V,...
-            t,tKF,tNoACK_KF,covPriorAdj,UOptions,alpha_cBar);
+            Nx,Nv,Nu,Np,SIn,AKF,Bu,E,M,C,W,V,alpha_cBar,...
+            cv,printDebugKF);
         
         if(printDebug)
             if(covPriorAdj)

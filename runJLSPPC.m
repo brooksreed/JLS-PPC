@@ -46,8 +46,8 @@ NpMult = 4; % the MPC horizon Np = Ts*NpMult
 %%%%%%%%%%%
 % SYSTEM (set up in setupSystemJPLPPC)
 
-%system = 'SISO_DOUBLE_INTEGRATOR';
-system = 'MIMO_DOUBLE_INTEGRATOR';
+system = 'SISO_DOUBLE_INTEGRATOR';
+%system = 'MIMO_DOUBLE_INTEGRATOR';
 %system = 'SCALAR';
 
 %%%%%%%%%%%
@@ -61,11 +61,11 @@ if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
     % 'SISO2' - [1 0], [0 1] for pi, xi
     % 'SISO4' - [1 0 0 0], [0 0 1 0] for pi, xi
     
-    sched = 'SISO4_piggyback';
+    %sched = 'SISO4_piggyback';
     %sched = 'SISO4_noACK';
     
     %sched = 'SISO2_noACK';
-    %sched = 'SISO2_piggyback';
+    sched = 'SISO2_piggyback';
     
     %sched = 'SISOALL_piggyback';
     %sched = 'SISOALL_noACK';
@@ -136,18 +136,22 @@ end
 %ta = 2;disp('OVERWRITING ta')
 
 % hardcoded sequences for consistent debugging
-
-if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
-    
+%if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
+if(~isempty(strfind(sched,'SISOALL')))
     % with SISOALL
-    %alpha_c(:,1:11) = [1 1 0 0 1 1 0 1 0 0 1];
-    %alpha_m(:,1:15) =  [1 1 1 0 1 1 0 0 1 1 0 0 0 1 1];
-    
+    alpha_c(:,1:11) = [1 1 0 0 1 1 0 1 0 0 1];
+    alpha_m(:,1:15) =  [1 1 1 0 1 1 0 0 1 1 0 0 0 1 1];
+elseif(~isempty(strfind(sched,'SISO2')))
     % with SISO2
     % Pi_c          =  [1 0 1 0 1 0 1 0 1 0 1 0];
     % Pi_m          =  [0 1 0 1 0 1 0 1 0 1 0 1];
     %alpha_m(:,1:15) =  [0 1 0 0 0 1 0 0 0 0 0 1 0 1 0];
     % one missed, 2 missed
+    
+    alpha_m(:,1:22) =  [0 1 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 1];
+    % 1 - 2 - 4 missed
+    
+elseif(~isempty(strfind(sched,'SISO4')))
     
     % with SISO4
     % Pi_c          =  [1 0 0 0 1 0 0 0 1 0 0 0];

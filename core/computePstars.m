@@ -1,6 +1,8 @@
-function E_termsSquared = computePstars(nStars)
+function E_termsSquared = computePstars(nStars,alphaBar)
+% Numerically evaluate Pstar coefficients for a given alphaBar
 
 % BR 6/22/2015
+% (much faster than the symbolic version)
 
 % G describes the rearranging of terms
 % u(t,t), u(t,t-1), etc. to (u(t,t)-u(t,t-1)) etc.  
@@ -78,10 +80,21 @@ for i = 1:nStars
 end
 
 % plug in and evaluate strings 
+ab = alphaBar;
+Eat = alphaBar;
+E_termsSquared = zeros(nStars,1);
+for i = 1:nStars
+    E_termsSquared(i)= eval(termStr{i});
+    %fprintf('%d:   ',i);disp(factor(E_termsSquared{i}))
+    %disp(E_termsSquared{i})
+end
+
+%{
+% plug in and evaluate strings 
 E_termsSquared = cell(nStars,1);
 for i = 1:nStars
     E_termsSquared{i} = eval(termStr{i});
     fprintf('%d:   ',i);disp(factor(E_termsSquared{i}))
     disp(E_termsSquared{i})
 end
-
+%}
