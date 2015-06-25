@@ -1,8 +1,14 @@
-function E_termsSquared = computePstars(nStars,alphaBar)
-% Numerically evaluate Pstar coefficients for a given alphaBar
+function E_termsSquared = computePstars(nStars,alphaBar,MODE)
+% compute Pstar coefficients for a given alphaBar
+% E_termsSquared = computePstars(nStars,alphaBar,MODE)
+% MODE= 'NUMERIC';
+% MODE = 'ANALYTIC'; (alphaBar not used)
 
 % BR 6/22/2015
-% (much faster than the symbolic version)
+% Numeric version (much faster than the symbolic version)
+% (symbolic version used to generate even faster analytic lookup)
+
+
 
 % G describes the rearranging of terms
 % u(t,t), u(t,t-1), etc. to (u(t,t)-u(t,t-1)) etc.  
@@ -53,6 +59,11 @@ end
 % square terms and store in string form
 termsSquared = cell(nStars,1);
 termStr = cell(nStars,1);
+
+if(strcmp(MODE,'ANALYTIC'))
+    E_termsSquared = cell(nStars,1);
+end
+
 for i = 1:nStars
     
     termsSquared{i} = expand(term{i}^2);    
@@ -77,24 +88,26 @@ for i = 1:nStars
     expr2 = '([\w]*at[\w]*)';
     termStr{i} = regexprep(tmp,expr2,'Eat');
     
+    if(strcmp(MODE,'ANALYTIC'))
+        
+        % plug in and evaluate strings
+        E_termsSquared{i} = eval(termStr{i});
+        fprintf('%d:   ',i);%disp(factor(E_termsSquared{i}))
+        disp(E_termsSquared{i})
+        
+    end
+    
 end
 
-% plug in and evaluate strings 
-ab = alphaBar;
-Eat = alphaBar;
-E_termsSquared = zeros(nStars,1);
-for i = 1:nStars
-    E_termsSquared(i)= eval(termStr{i});
-    %fprintf('%d:   ',i);disp(factor(E_termsSquared{i}))
-    %disp(E_termsSquared{i})
+if(strcmp(MODE,'NUMERIC'))
+    
+    % plug in and evaluate strings 
+    ab = alphaBar;
+    Eat = alphaBar;
+    E_termsSquared = zeros(nStars,1);
+    for i = 1:nStars
+        E_termsSquared(i)= eval(termStr{i});
+    end
+
 end
 
-%{
-% plug in and evaluate strings 
-E_termsSquared = cell(nStars,1);
-for i = 1:nStars
-    E_termsSquared{i} = eval(termStr{i});
-    fprintf('%d:   ',i);disp(factor(E_termsSquared{i}))
-    disp(E_termsSquared{i})
-end
-%}

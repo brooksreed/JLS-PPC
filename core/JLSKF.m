@@ -4,7 +4,7 @@ function [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
 %     E,M,C,W,V,t,tKF,tNoACK,covPriorAdj,uOptions,alpha_cBar)
 %
 % XHat is state estimate (system + buffer)
-% P is error cov. 
+% P is error cov.
 % yKF: meas into KF, D_m: meas success matrix
 % USent: control plan as sent (used if packet successful)
 % D_cHat: estimate of control jump variable
@@ -15,10 +15,11 @@ function [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
 % else, cv must be a struct with the following fields:
 %   uOptions: NU x tNoACK vector of alternate control actions that might be
 %       applied depending on control packet success history
-            % Uoptions is indexed backwards
-            % Uoptions(:,1) is most recent, (:,tNoACK_KF) is furthest back
+% Uoptions is indexed backwards
+% Uoptions(:,1) is most recent, (:,tNoACK_KF) is furthest back
 %   tNoACK: time since ACK received (for covPriorAdj)
-%   PstarCoefficients: vector of coefficients for Pstar
+%   PstarCoefficients: vector of coefficients for Pstar(1:nStars-1)
+%   PstarFinalCoefficients: vector of
 % pd struct: if(pd==0 or [], printDebug = 0)
 %   t: true time at estimator when fcn is called (mostly for debugging)
 %   tKF: physical time step KF is updating -- xHat(tKF|tKF) posterior
@@ -26,8 +27,8 @@ function [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
 % v1.0 6/13/2015
 % v1.1 6/16/2015
 
-% TO DO: 
-% more Pstars for SISO  -- AUTOMATE 
+% TO DO:
+% more Pstars for SISO  -- AUTOMATE
 % (need to load-in "lookup table")
 
 % add in printDebug
@@ -39,6 +40,7 @@ if(isstruct(cv))
     tNoACK = cv.tNoACK;
     if(size(Bu,2)==1)
         PstarCoefficients = cv.PstarCoefficients;
+        PstarFinalCoefficients = cv.PstarFinalCoefficients;
         nStars = length(PstarCoefficients);
     end
     
@@ -57,10 +59,10 @@ end
 Ppre0 = A*P*A' + W ; %P_{t+1|t}
 
 if( covPriorAdj && (max(tNoACK)>0) )
-          
+    
     % SENT control command for step t
     ut = E*USent;
-
+    
     dU = zeros(size(ut,1),max(tNoACK));
     for i = 1:max(tNoACK)
         dU(:,i) = (ut - uOptions(:,i));
@@ -72,7 +74,7 @@ if( covPriorAdj && (max(tNoACK)>0) )
     fprintf('\nt=%d, KF: dU=',t)
     disp(dU)
     %}
-        
+    
     % Single input systems
     if(size(Bu,2)==1)
         
@@ -90,9 +92,31 @@ if( covPriorAdj && (max(tNoACK)>0) )
         end
         
         % NOTE -- uHistory are from prev. COMPUTED buffers
-        % they are not necessarily shifts of the buffer estimate in Xh        
+        % they are not necessarily shifts of the buffer estimate in Xh
         Pstar = zeros(size(P,1),size(P,2),tNoACK);
         
+        if(tNoACK>1)
+            for j = 1:(tNoACK-1)
+                Pstar(:,:,j) = PstarCoefficients(j)*Bu*dU(:,j)*dU(:,j)'*Bu';
+            end
+        end
+        Pstar(:,:,tNoACK) = PstarFinalCoefficients(tNoACK)*Bu*dU(:,tNoACK)*dU(:,tNoACK)'*Bu';
+        
+        if(printDebug)
+            % print out sum of Pstar terms
+            if(size(Pstar,1)==1)
+                fprintf('\nt=%d, KF tKF=%d, P* = %f \n',t, tKF,...
+                    squeeze(sum(Pstar,3)))
+            else
+                fprintf('\nt=%d, KF tKF=%d, P* = \n',t, tKF)
+                disp(squeeze(sum(Pstar,3)))
+            end
+            
+            % (deeper debug option of printing out individual terms?)
+            
+        end
+        
+        %{
         if(tNoACK==1)
             
             % 1-step term is 'special'
@@ -154,6 +178,7 @@ if( covPriorAdj && (max(tNoACK)>0) )
             end
             
         end
+        %}
         
         Ppre = Ppre0+sum(Pstar,3);
         
@@ -164,10 +189,10 @@ if( covPriorAdj && (max(tNoACK)>0) )
         % (zero out dU manually for ACK'd channels?)
         
         % off diagonal elements
-        EAZA = diag(alpha_cBar)*dU(:,1)*dU(:,1)'*diag(alpha_cBar);   
+        EAZA = diag(alpha_cBar)*dU(:,1)*dU(:,1)'*diag(alpha_cBar);
         
         % replace diagonal elements
-        dum = diag(alpha_cBar)*dU(:,1)*dU(:,1)';     
+        dum = diag(alpha_cBar)*dU(:,1)*dU(:,1)';
         for i = 1:Nu; EAZA(i,i) = dum(i,i) ; end;
         
         Pstar = Bu*(EAZA - diag(alpha_cBar)*dU(:,1)*dU(:,1)'*...

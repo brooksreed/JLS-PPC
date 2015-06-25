@@ -48,10 +48,18 @@ if(covPriorAdj)
     % compute Pstar terms for specific alpha_cBar
     if(length(alpha_cBar)==1)
         
-        % possibly load in the symbolic lookup table - would be slightly
-        % faster
+        % load in the symbolic lookup table - faster
+        [PstarCoefficients,PstarFinalCoefficients] = ...
+            evaluatePstars(alpha_cBar);
+        cv.PstarCoefficients = PstarCoefficients;
+        cv.PstarFinalCoefficients = PstarFinalCoefficients;
+        %nStars = length(PstarCoefficients);
+        
+        % compute for this nStars numerically
+        %{
         nStars = 6;
         PstarCoefficients = computePstars(nStars,alpha_cBar);
+        %}
         
     else
         %
@@ -146,7 +154,12 @@ for t = (tm+1):(Ns-1)
     tNoACKSave{t} = tNoACK;
     
     if(printDebug)
-        disp(tNoACK)
+        dispStart = t-8;
+        dispEnd = t+Ts+2;
+        if(dispStart<1);dispStart=1;end
+        if(dispEnd>Ns);dispEnd=Ns;end
+        fprintf('\n tNoACK(%d:%d):',dispStart,dispEnd)
+        disp(tNoACK(:,dispStart:dispEnd))
     end
     
     %%%%%%%%%%%%%%%
@@ -237,7 +250,6 @@ for t = (tm+1):(Ns-1)
         if(covPriorAdj)
             cv.uOptions = uOptions;
             cv.tNoACK = tNoACK_KF;
-            cv.PstarCoefficients = PstarCoefficients;
         else
             cv=0;
         end
@@ -263,7 +275,6 @@ for t = (tm+1):(Ns-1)
             end
             if(size(A,1)==1)
                 % only print estimate for scalar sys
-                % (ADD A WINDOW?)
                 dispStart = tKF-5;
                 if(dispStart<1);dispStart=1;end
                 fprintf('Xh(:,%d:%d)=\n',dispStart,tKF);disp(Xh(:,dispStart:tKF)')
@@ -293,7 +304,7 @@ for t = (tm+1):(Ns-1)
         Dfwd = D_cHat(:,:,(t-tm):(t+tc-1));
         [XhMPC(:,:,t+tc),kpi] = prepMPC(t,Xh(:,t-tm),Ufwd,Dfwd,Pi_c,...
             A,Bu,E,M,Nx,Nv,Nu,Np,tm,tc);
-        
+              
         solveStatus = 0;
         counter = 1;
         TMPC = Np;

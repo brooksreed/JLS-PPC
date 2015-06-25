@@ -38,7 +38,7 @@ clc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % SIM LENGTH
-Ns = 30; % sim length
+Ns = 60; % sim length
 
 % MPC HORIZON:
 NpMult = 4; % the MPC horizon Np = Ts*NpMult
