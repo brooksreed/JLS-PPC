@@ -95,6 +95,11 @@ for i = 1:nStars
         fprintf('%d:   ',i);%disp(factor(E_termsSquared{i}))
         disp(E_termsSquared{i})
         
+        %
+        diary off
+        diary on
+        %
+        
     end
     
 end
