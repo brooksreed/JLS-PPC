@@ -19,11 +19,6 @@ function [results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tac,...
 
 printDebug = 1;
 
-% currently always uses alphaBar state prior adjustment
-if(covPriorAdj)
-    disp('COV PRIOR ADJUST ON')
-end
-
 % initialization stuff
 Nx = size(A,1);
 Nv = length(alpha_cBar);
@@ -45,10 +40,34 @@ tNoACK(:,1:Ns) = 1:Ns;
 % start = tmp(2)+tc
 % tNoACK(:,start:Ns) = 1:(Ns-start);
 
-
-
 % tNoACK *AS KNOWN EACH STEP*
 tNoACKSave = cell(Ns);
+
+if(covPriorAdj)
+    disp('COV PRIOR ADJUST ON')
+    % compute Pstar terms for specific alpha_cBar
+    if(length(alpha_cBar)==1)
+        
+        % load in the symbolic lookup table - faster
+        [PstarCoefficients,PstarFinalCoefficients] = ...
+            evaluatePstars(alpha_cBar);
+        cv.PstarCoefficients = PstarCoefficients;
+        cv.PstarFinalCoefficients = PstarFinalCoefficients;
+        
+        % optionally, if nStars>11 desired, can compute numerically for a
+        % specific alpha_cBar (may take a while)
+        %{
+        nStars = 12;
+        PstarCoefficients = computePstars(nStars,alpha_cBar,'NUMERIC');
+        %}
+        
+    else
+        %
+        disp('USING MULTIVEHICLE ONE-STEP P* APPROX')
+    end
+    
+end
+
 
 Umax = repmat(umax,1,Ns+Np);
 Umin = repmat(umin,1,Ns+Np);
@@ -135,7 +154,12 @@ for t = (tm+1):(Ns-1)
     tNoACKSave{t} = tNoACK;
     
     if(printDebug)
-        disp(tNoACK)
+        dispStart = t-8;
+        dispEnd = t+Ts+2;
+        if(dispStart<1);dispStart=1;end
+        if(dispEnd>Ns);dispEnd=Ns;end
+        fprintf('\n tNoACK(%d:%d):',dispStart,dispEnd)
+        disp(tNoACK(:,dispStart:dispEnd))
     end
     
     %%%%%%%%%%%%%%%
@@ -177,11 +201,7 @@ for t = (tm+1):(Ns-1)
                     end
                 end
                 %} 
-                
-                % ambiguity: ACKs don't ACK all channels...
-                % which P*, P**, etc. to use?  
-                % for now, use Pstar each step? 
-                % (only 1-step formulated anyway)
+
                 % (artificially constrain dU to zero for ACK'd channels?)
                 % (DO THIS HERE? OR INSIDE KF?)
                 
@@ -190,19 +210,21 @@ for t = (tm+1):(Ns-1)
             end
             
             % prepare control options for use in cov. prior adj.
-            UOptions = zeros(NU,tNoACK_KF);
+            % Uoptions is indexed backwards
+            % Uoptions(:,1) is most recent, (:,tNoACK_KF) is furthest back
+            uOptions = zeros(NU,tNoACK_KF);
             for k = 1:tNoACK_KF
                 if(tKF-k<1)
                     bTMP = zeros(Nu*Np*Nv,1);
                 else
                     bTMP = bNoLoss(:,tKF-k);
                 end
-                UOptions(:,k) = E*M^k*bTMP;
+                uOptions(:,k) = E*M^k*bTMP;
             end
             
         else
             
-            UOptions = [];
+            uOptions = [];
             tNoACK_KF = [];
             
         end
@@ -225,10 +247,20 @@ for t = (tm+1):(Ns-1)
             SIn = D_m(:,:,tKF);
         end
         
+        if(covPriorAdj)
+            cv.uOptions = uOptions;
+            cv.tNoACK = tNoACK_KF;
+        else
+            cv=0;
+        end
+        
+        %printDebugKF=0;
+        printDebugKF.t = t;printDebugKF.tKF = tKF;
+            
         % Xh(:,t-tm): xHat_{t-tm|t-tm},bHat_{t-tm-1}
         [Xh(:,tKF),P(:,:,tKF)] = JLSKF(XhIn,Pin,yIn,Uin,DKFh,...
-            Nx,Nv,Nu,Np,SIn,AKF,Bu,E,M,C,W,V,...
-            t,tKF,tNoACK_KF,covPriorAdj,UOptions,alpha_cBar);
+            Nx,Nv,Nu,Np,SIn,AKF,Bu,E,M,C,W,V,alpha_cBar,...
+            cv,printDebugKF);
         
         if(printDebug)
             if(covPriorAdj)
@@ -243,7 +275,6 @@ for t = (tm+1):(Ns-1)
             end
             if(size(A,1)==1)
                 % only print estimate for scalar sys
-                % (ADD A WINDOW?)
                 dispStart = tKF-5;
                 if(dispStart<1);dispStart=1;end
                 fprintf('Xh(:,%d:%d)=\n',dispStart,tKF);disp(Xh(:,dispStart:tKF)')
@@ -273,7 +304,7 @@ for t = (tm+1):(Ns-1)
         Dfwd = D_cHat(:,:,(t-tm):(t+tc-1));
         [XhMPC(:,:,t+tc),kpi] = prepMPC(t,Xh(:,t-tm),Ufwd,Dfwd,Pi_c,...
             A,Bu,E,M,Nx,Nv,Nu,Np,tm,tc);
-        
+              
         solveStatus = 0;
         counter = 1;
         TMPC = Np;
