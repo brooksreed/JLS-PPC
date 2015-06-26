@@ -19,7 +19,6 @@
 % clean up/separate inputs vs. other?
 % one toggle for 'debugging mode'?
 % more detailed plots for SISO
-% more Pstars
 
 % MIMO cleaner system setup, make Nc and Nm vs. Nv?
 % MIMO basic plots
@@ -38,7 +37,7 @@ clc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % SIM LENGTH
-Ns = 60; % sim length
+Ns = 40; % sim length
 
 % MPC HORIZON:
 NpMult = 4; % the MPC horizon Np = Ts*NpMult

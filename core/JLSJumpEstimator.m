@@ -5,24 +5,21 @@ function [D_cHat,alpha_cHat,D_a,KFstart,tNoACK,gotACK] = ...
 % [D_cHat,alpha_cHat,D_a,KFstart,tNoACK,gotACK] = ...
 %    JLSJumpEstimator(D_cHat,Pi_c,D_a,alpha_c,alpha_cHat,Pi_a,Ts,...
 %    alpha_a,t,tm,tc,ta,tac,Nu,Np,tNoACK,nACKHistory,printDebug)
-% Updates D_cHat based on delayed ACKs
+% Updates D_cHat, alpha_cHat based on delayed ACKs
 % Determines time that ACK'd buffer starts, outputs KFstart
+% Keeps track of tNoACK counter, also outputs gotACK flag
 %
+% Algorithm will back up as far as it can towards the most recent time of
+% an ACK, using ACK histories.  
+% It does not back up extra far (does not use all ACK history if not
+% needed).  
+% tNoACK(t-ta) resets to zero if ACK received at time t 
 
 
 % BR, 5/27/2015 (modified from single ACK version)
 % 5/28 - ACK histories
 % v1.0 6/13/2015
 % v1.1 6/16/2015
-
-% TO DO: 
-% improve help @ top...
-
-% Algorithm will back up as far as it can towards the most recent time of
-% an ACK, using ACK histories.  
-% It does not back up extra far (does not use all ACK history if not
-% needed).  
-% tNoACK(t-ta) resets to zero if ACK received at time t 
 
 nACKs = size(tNoACK,1);
 

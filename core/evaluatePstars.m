@@ -9,9 +9,9 @@ function [Ps,PsFinal] = evaluatePstars(ab)
 % BR, 6/25/2015
 
 %{
-if(nStars>10)
+if(nStars>11)
    disp('WARNING: Only nStars=10 supported, returning that')
-   nStars=10;
+   nStars=11;
 end
 %}
 

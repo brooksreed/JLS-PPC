@@ -53,12 +53,12 @@ if(covPriorAdj)
             evaluatePstars(alpha_cBar);
         cv.PstarCoefficients = PstarCoefficients;
         cv.PstarFinalCoefficients = PstarFinalCoefficients;
-        %nStars = length(PstarCoefficients);
         
-        % compute for this nStars numerically
+        % optionally, if nStars>11 desired, can compute numerically for a
+        % specific alpha_cBar (may take a while)
         %{
-        nStars = 6;
-        PstarCoefficients = computePstars(nStars,alpha_cBar);
+        nStars = 12;
+        PstarCoefficients = computePstars(nStars,alpha_cBar,'NUMERIC');
         %}
         
     else
