@@ -31,7 +31,7 @@ Ps(5) = - ab^12 + 10*ab^11 - 45*ab^10 + 120*ab^9 - 210*ab^8 + 252*ab^7 - 211*ab^
 PsFinal(5) =  - ab^10 + 10*ab^9 - 45*ab^8 + 120*ab^7 - 210*ab^6 + 251*ab^5 - 205*ab^4 + 110*ab^3 - 35*ab^2 + 5*ab;
 
 Ps(6) = - ab^14 + 12*ab^13 - 66*ab^12 + 220*ab^11 - 495*ab^10 + 792*ab^9 - 924*ab^8 + 793*ab^7 - 501*ab^6 + 235*ab^5 - 86*ab^4 + 27*ab^3 - 7*ab^2 + ab;
-PsFinal(6) = - ab^12 + 12*ab^11 - 6*ab^10 + 220*ab^9 - 495*ab^8 + 792*ab^7 - 923*ab^6 + 786*ab^5 - 480*ab^4 + 200*ab^3 - 51*ab^2 + 6*ab;
+PsFinal(6) = - ab^12 + 12*ab^11 - 66*ab^10 + 220*ab^9 - 495*ab^8 + 792*ab^7 - 923*ab^6 + 786*ab^5 - 480*ab^4 + 200*ab^3 - 51*ab^2 + 6*ab;
  
 Ps(7) = - ab^16 + 14*ab^15 - 91*ab^14 + 364*ab^13 - 1001*ab^12 + 2002*ab^11 - 3003*ab^10 + 3432*ab^9 - 3004*ab^8 + 2009*ab^7 - 1022*ab^6 + 399*ab^5 - 126*ab^4 + 35*ab^3 - 8*ab^2 + ab;
 PsFinal(7) = - ab^14 + 14*ab^13 - 91*ab^12 + 364*ab^11 - 1001*ab^10 + 2002*ab^9 - 3003*ab^8 + 3431*ab^7 - 2996*ab^6 + 1981*ab^5 - 966*ab^4 + 329*ab^3 - 70*ab^2 + 7*ab;
@@ -49,6 +49,7 @@ PsFinal(10) = - ab^20 + 20*ab^19 - 190*ab^18 + 1140*ab^17 - 4845*ab^16 + 15504*a
 PsFinal(11) = - ab^22 + 22*ab^21 - 231*ab^20 + 1540*ab^19 - 7315*ab^18 + 26334*ab^17 - 74613*ab^16 + 170544*ab^15 - 319770*ab^14 + 497420*ab^13 - 646646*ab^12 + 705431*ab^11 - 646635*ab^10 + 497365*ab^9 - 319605*ab^8 + 170214*ab^7 - 74151*ab^6 + 25872*ab^5 - 6985*ab^4 + 1375*ab^3 - 176*ab^2 + 11*ab;
  
 %PsFinal(12) = 
+
 % Final term has different structure (pass both to KF, it handles)
 % PstarCoefficients = Ps(1:nStars-1);
 % PstarCoefficients(nStars) = PsFinal(nStars);
