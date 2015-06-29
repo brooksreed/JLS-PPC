@@ -137,8 +137,11 @@ if( covPriorAdj && (max(tNoACK)>0) )
             diag(alpha_cBar))*Bu';
         
         Ppre = Ppre0+Pstar;
+        
+        
         fprintf('\nt=%d, KF tKF=%d, MIMO P*: \n',t,tKF)
         disp(Pstar)
+        
         
     end
 else

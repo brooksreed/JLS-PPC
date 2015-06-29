@@ -6,17 +6,6 @@
 
 % BR, 6/18/2015
 
-%%%%%%%%%%%%%%%%%%
-
-if(strfind(sched,'piggyback'))
-    if(ta~=tm)
-        disp('warning - resetting ta to tm')
-        ta = tm;
-    end
-    alpha_aBar = alpha_mBar;
-elseif(strfind(sched,'NoACK'))
-    ta = 0;
-end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SYSTEM INIT/SETUP
@@ -127,6 +116,18 @@ for k = 1:Ns
     alpha_m(:,k) = (sign(rand(Nv,1) - (1-(alpha_mBar)))*0.5 + 0.5);
     alpha_c(:,k) = (sign(rand(Nv,1) - (1-(alpha_cBar)))*0.5 + 0.5);
     alpha_a(:,k) = (sign(rand(Nv,1) - (1-(alpha_aBar)))*0.5 + 0.5);
+end
+
+%%%%%%%%%%%%%%%%%%
+
+if(strfind(sched,'piggyback'))
+    if(ta~=tm)
+        disp('warning - resetting ta to tm')
+        ta = tm;
+    end
+    alpha_aBar = alpha_mBar;
+elseif(strfind(sched,'NoACK'))
+    ta = 0;
 end
 
 % schedule time series

@@ -32,6 +32,7 @@ clear variables
 close all
 clc
 
+printDebug = 1;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SYSTEM DEFINITION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -175,7 +176,7 @@ end
 
 [r] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tac,...
     alpha_cBar,Pi_c,Pi_m,Pi_a,Ts,umax,umin,codebook,Xmax,Xmin,xIC,P1,...
-    xHat1,w,v,alpha_c,alpha_m,alpha_a,covPriorAdj,nACKHistory);
+    xHat1,w,v,alpha_c,alpha_m,alpha_a,covPriorAdj,nACKHistory,printDebug);
 
 r.sys.sched = sched;
 r.sys.system =system;

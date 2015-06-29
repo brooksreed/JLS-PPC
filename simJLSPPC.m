@@ -1,6 +1,6 @@
 function [results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tac,...
     alpha_cBar,Pi_c,Pi_m,Pi_a,Ts,umax,umin,codebook,Xmax,Xmin,xIC,P1,...
-    xHat1,w,v,alpha_c,alpha_m,alpha_a,covPriorAdj,nACKHistory)
+    xHat1,w,v,alpha_c,alpha_m,alpha_a,covPriorAdj,nACKHistory,printDebug)
 % runs simulation of MJLS/scheduled PPC
 
 % currently restricts to time-invariant constraint input
@@ -17,7 +17,6 @@ function [results] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tac,...
 % Add logging of P*, P**, etc.?
 % Add more automated tests/checks?
 
-printDebug = 1;
 
 % initialization stuff
 Nx = size(A,1);
@@ -186,7 +185,7 @@ for t = (tm+1):(Ns-1)
             % determine tNoACK vector for specific filter step
             if(Nv==1)
                 if(tKF-1-tac>0)
-                    tNoACK_KF = tNoACK(i,tKF+tac-1);
+                    tNoACK_KF = tNoACK(1,tKF+tac-1);
                 else
                     tNoACK_KF = 1;
                 end
@@ -254,8 +253,10 @@ for t = (tm+1):(Ns-1)
             cv=0;
         end
         
-        %printDebugKF=0;
-        printDebugKF.t = t;printDebugKF.tKF = tKF;
+        printDebugKF=0;
+        if(printDebugKF~=0)
+            printDebugKF.t = t;printDebugKF.tKF = tKF;
+        end
             
         % Xh(:,t-tm): xHat_{t-tm|t-tm},bHat_{t-tm-1}
         [Xh(:,tKF),P(:,:,tKF)] = JLSKF(XhIn,Pin,yIn,Uin,DKFh,...
