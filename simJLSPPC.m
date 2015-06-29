@@ -417,8 +417,8 @@ results.MPCFail = MPCFail;
 
 results.looptime = looptime;
 results.Jsim = Jsim/Ns;
-results.rmsEstError = nanrms(X(1:Nv,:) - Xh(1:Nv,:),2);
-results.rmsPosError = nanrms(X(1,:),2);
+results.rmsEstError = nanrms(X(1:Nx,:) - Xh(1:Nx,:),2);
+results.rmsStateError = nanrms(X(1:Nx,:),2);
 
 % run-specific parameters
 results.P1 = P1;
