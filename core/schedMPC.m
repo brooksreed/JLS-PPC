@@ -3,16 +3,16 @@ function [U,cost,status,XOut,violateSlack] = schedMPC(xIn,...
             umax,umin,xmin,xmax,u_deadband)
 % solve deterministic scheduled MPC with cvx 
 % [U,cost,status,XOut,violateSlack] = schedMPC(xIn,...
-%            bHatMPC,kpi,horizon,A,Bu,M,E,Q,Qf,R,umax,umin,xmin,xmax,uDB)
+%            bHatMPC,p_i,horizon,A,Bu,M,E,Q,Qf,R,...
+%            umax,umin,xmin,xmax,u_deadband)
 % xIn: (Nx x 1) xHat_{t+tc|t-tm}, bHatMPC: (Nv*Nu*horizon x 1) bHat_{t+tc-1}
-% k_priors: Nv x 1 vector of #steps to constrain control priors 
-% horizon: horizon; A,Bu: system
+% p_i: Nv x 1 vector of #steps to constrain control priors 
+% horizon:  A,Bu: system
 % M, E: buffer shift
-% Q, Qf, R: LQR params
+% Q, Qf, R: cost function params (states, terminal states, controls)
 % umax, umin: (Nu x horizon) control constraints
 % xmin and xmax are optional, default is none
 % state constraints implemented with slack variable "barrier"
-% violations ouput gives i (state), j (time step) and violation size
 % uDB is deadband width (NOTE - this makes MPC very slow, requires MIQP
 %   solver such as Gurobi)
 %
@@ -20,6 +20,7 @@ function [U,cost,status,XOut,violateSlack] = schedMPC(xIn,...
 % cost, status from CVX
 % XOut output gives predicted state trajectory
 % violateSlack is for state constraints (if forced to be violated)
+% violations ouput gives i (state), j (time step) and violation size
 
 % BR, 4/29/2014
 %{

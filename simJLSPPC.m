@@ -3,8 +3,15 @@ function [results] = simJLSPPC(Ns,Np,Asys,Busys,Bwsys,Csys,...
     umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,w,v,a_c,a_m,a_a,...
     covPriorAdj,nACKHistory,printDebug)
 % runs simulation of MJLS/scheduled PPC
-
-
+% [results] = simJLSPPC(Ns,Np,Asys,Busys,Bwsys,Csys,...
+%     QMPC,QfMPC,RMPC,WKF,VKF,tm,tc,ta,tac,acBar,Pi_c,Pi_m,Pi_a,Ts,...
+%     umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,w,v,a_c,a_m,a_a,...
+%     covPriorAdj,nACKHistory,printDebug)
+%
+% inputs approximately match variables in paper
+% covPriorAdj = {1,0} toggle for using cov. prior adjustments in KF
+% printDebug = {1,0} 'global' toggle for debug printouts
+% results: large struct of results
 
 % BR, 4/23/2014
 % modifying for delayed ACKs, 6/13/2014

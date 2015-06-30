@@ -1,11 +1,11 @@
-function [XHat_global,P_global] = JLSKF(XHat_global,P_global,yKF_in,...
+function [XHat_out,P_out] = JLSKF(XHat_in,P_in,yKF,...
     USent,D_cHat_all,Nx,Nagents,Nctrls,Nhorizon,D_m_now,...
     A,Bu,E1,M1,C,W,V,alpha_cBar_sys,cv,pd)
 % [XHat_global,P_global] = JLSKF(XHat_global,P_global,yKF_in,...
 %     USent,D_cHat_all,Nx,Nagents,Nctrls,Nhorizon,D_m_now,...
 %     A,Bu,E1,M1,C,W,V,alpha_cBar_sys,cv,pd)
-% XHat is state estimate (system + buffer)
-% P is error cov.
+% XHat is state estimate (system + buffer), all time steps
+% P is error cov., all time steps
 % yKF: meas into KF, D_m: meas success matrix
 % USent: control plan as sent (used if packet successful)
 % D_cHat: estimate of control jump variable
@@ -53,7 +53,7 @@ elseif(isempty(pd) || pd==0)
 end
 
 % covariance prior (standard)
-Ppre0 = A*P_global*A' + W ; %P_{t+1|t}
+Ppre0 = A*P_in*A' + W ; %P_{t+1|t}
 
 if( covPriorAdj && (max(tNoACK)>0) )
     
@@ -83,7 +83,7 @@ if( covPriorAdj && (max(tNoACK)>0) )
         
         % NOTE -- uHistory are from prev. COMPUTED buffers
         % they are not necessarily shifts of the buffer estimate in Xh
-        Pstar = zeros(size(P_global,1),size(P_global,2),tNoACK);
+        Pstar = zeros(size(P_in,1),size(P_in,2),tNoACK);
         
         % Construct covariance addition terms: P*
         if(tNoACK>1)
@@ -153,7 +153,7 @@ end
 
 % Kalman gain = fcn of Ppre
 L = ((Ppre*C')/(C*Ppre*C'+V))*D_m_now;   % L_{t}
-P_global = Ppre - L*(C*Ppre);
+P_out = Ppre - L*(C*Ppre);
 
 % propagate system
 I = eye(size(A));
@@ -162,7 +162,7 @@ AAHat = [(I-L*C)*A,...
     zeros(Nagents*Nhorizon*Nctrls,Nx),...
     M1*(eye(Nhorizon*Nctrls*Nagents)-D_cHat_all)];
 BUHat = [(I-L*C)*Bu*E1*D_cHat_all;D_cHat_all];
-XHat_global = AAHat*XHat_global + BUHat*USent + ...
-    [L;zeros(Nhorizon*Nctrls*Nagents,size(yKF_in,1))]*yKF_in;
+XHat_out = AAHat*XHat_in + BUHat*USent + ...
+    [L;zeros(Nhorizon*Nctrls*Nagents,size(yKF,1))]*yKF;
 
 end
