@@ -38,7 +38,7 @@ printDebug = 1;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % SIM LENGTH
-Ns = 40; % sim length
+simLength = 20; % sim length
 
 % MPC HORIZON:
 NpMult = 4; % the MPC horizon Np = Ts*NpMult
@@ -83,14 +83,14 @@ elseif( ~isempty(strfind(system,'MIMO')))
 end
 
 % DELAYS
-tc = 1; % control delay
-tm = 1; % meas delay (Also ACK delay with piggyback unless overwritten)
-ta = 1; % ACK delay
+tau_c = 1; % control delay
+tau_m = 1; % meas delay (Also ACK delay with piggyback unless overwritten)
+tau_a = 1; % ACK delay
 
 % ACK SETTINGS
 % # ACK Histories sent (makes most sense to be multiple of schedule length)
 % For 'SINGLE ACK': sys nACKHistory = Ts (schedule length)
-nACKHistory = 5;
+ACKHistoryLength = 5;
 % adjustment to covariance priors due to no ACKs/control losses:
 covPriorAdj = 1;
 
@@ -120,6 +120,8 @@ else
 end
 
 %% system setup
+
+% (system params are in setupSystemJLSPPC script)
 setupSystemJLSPPC
 
 % initial conditions
@@ -174,9 +176,9 @@ end
 
 % (pull-out run-specific parameters for re-running?)
 
-[r] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tac,...
+[r] = simJLSPPC(simLength,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tau_m,tau_c,tau_a,tac,...
     alpha_cBar,Pi_c,Pi_m,Pi_a,Ts,umax,umin,codebook,Xmax,Xmin,xIC,P1,...
-    xHat1,w,v,alpha_c,alpha_m,alpha_a,covPriorAdj,nACKHistory,printDebug);
+    xHat1,w,v,alpha_c,alpha_m,alpha_a,covPriorAdj,ACKHistoryLength,printDebug);
 
 r.sys.sched = sched;
 r.sys.system =system;
@@ -210,19 +212,19 @@ else
     % very simple MIMO plot:
     
     NxSys = size(r.P,1);    % underlying system states (no buffer)
-    Ns = size(r.X,2);
+    simLength = size(r.X,2);
     
     CPlot = C;
     figure
     subplot(3,1,[1 2])
-    hx = plot(0:Ns-1,CPlot*r.X(1:NxSys,:));
+    hx = plot(0:simLength-1,CPlot*r.X(1:NxSys,:));
     hold on
-    hxh = plot(0:Ns-1,CPlot*r.Xh(1:NxSys,:),':');
+    hxh = plot(0:simLength-1,CPlot*r.Xh(1:NxSys,:),':');
     legend([hx(1) hxh(1)],'X','XHat')
     title('MIMO System (colors are i/o channels)')
     
     subplot(3,1,3)
-    hu = stairs(repmat(0:Ns-1,[2,1])',r.u');
+    hu = stairs(repmat(0:simLength-1,[2,1])',r.u');
     xlabel('time step')
     ylabel('u')
     

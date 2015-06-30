@@ -2,11 +2,13 @@ function E_termsSquared = computePstars(nStars,alphaBar,MODE)
 % compute Pstar coefficients for a given alphaBar
 % E_termsSquared = computePstars(nStars,alphaBar,MODE)
 % MODE= 'NUMERIC';
-% MODE = 'ANALYTIC'; (alphaBar not used)
+% MODE = 'ANALYTIC'; (alphaBar not used - any input is fine)
 
 % BR 6/22/2015
-% Numeric version (much faster than the symbolic version)
-% (symbolic version used to generate even faster analytic lookup)
+% Symbolic version used to generate fast analytic lookup
+%   (experienced problems with symbolic when nStars>11)
+% Numeric version with a given alphaBar
+%   (much faster than the symbolic version, but lookup is faster)
 
 
 

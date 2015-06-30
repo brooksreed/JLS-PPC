@@ -1,5 +1,6 @@
 function datestring=dateString(size)
-% creates a string based on the date and time
+% creates a string based on the date and time 
+% (useful for unique filenames when automating save)
 % for example, for creating file names to save
 % datestring=dateString(size)
 % 2 options for size input

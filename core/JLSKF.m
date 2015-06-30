@@ -1,8 +1,9 @@
-function [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
-    E,M,C,W,V,alpha_cBar,cv,pd)
-% [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
-%     E,M,C,W,V,alpha_cBar,cv,pd)
-%
+function [XHat_global,P_global] = JLSKF(XHat_global,P_global,yKF_in,...
+    USent,D_cHat_all,Nx,Nagents,Nctrls,Nhorizon,D_m_now,...
+    A,Bu,E1,M1,C,W,V,alpha_cBar_sys,cv,pd)
+% [XHat_global,P_global] = JLSKF(XHat_global,P_global,yKF_in,...
+%     USent,D_cHat_all,Nx,Nagents,Nctrls,Nhorizon,D_m_now,...
+%     A,Bu,E1,M1,C,W,V,alpha_cBar_sys,cv,pd)
 % XHat is state estimate (system + buffer)
 % P is error cov.
 % yKF: meas into KF, D_m: meas success matrix
@@ -52,12 +53,12 @@ elseif(isempty(pd) || pd==0)
 end
 
 % covariance prior (standard)
-Ppre0 = A*P*A' + W ; %P_{t+1|t}
+Ppre0 = A*P_global*A' + W ; %P_{t+1|t}
 
 if( covPriorAdj && (max(tNoACK)>0) )
     
     % SENT control command for step t
-    ut = E*USent;
+    ut = E1*USent;
     
     dU = zeros(size(ut,1),max(tNoACK));
     for i = 1:max(tNoACK)
@@ -82,7 +83,7 @@ if( covPriorAdj && (max(tNoACK)>0) )
         
         % NOTE -- uHistory are from prev. COMPUTED buffers
         % they are not necessarily shifts of the buffer estimate in Xh
-        Pstar = zeros(size(P,1),size(P,2),tNoACK);
+        Pstar = zeros(size(P_global,1),size(P_global,2),tNoACK);
         
         % Construct covariance addition terms: P*
         if(tNoACK>1)
@@ -127,14 +128,14 @@ if( covPriorAdj && (max(tNoACK)>0) )
         end
         
         % off diagonal elements
-        EAZA = diag(alpha_cBar)*dU(:,1)*dU(:,1)'*diag(alpha_cBar);
+        EAZA = diag(alpha_cBar_sys)*dU(:,1)*dU(:,1)'*diag(alpha_cBar_sys);
         
         % replace diagonal elements
-        dum = diag(alpha_cBar)*dU(:,1)*dU(:,1)';
-        for i = 1:Nu; EAZA(i,i) = dum(i,i) ; end;
+        dum = diag(alpha_cBar_sys)*dU(:,1)*dU(:,1)';
+        for i = 1:Nctrls; EAZA(i,i) = dum(i,i) ; end;
         
-        Pstar = Bu*(EAZA - diag(alpha_cBar)*dU(:,1)*dU(:,1)'*...
-            diag(alpha_cBar))*Bu';
+        Pstar = Bu*(EAZA - diag(alpha_cBar_sys)*dU(:,1)*dU(:,1)'*...
+            diag(alpha_cBar_sys))*Bu';
         
         Ppre = Ppre0+Pstar;
         
@@ -151,14 +152,17 @@ else
 end
 
 % Kalman gain = fcn of Ppre
-L = ((Ppre*C')/(C*Ppre*C'+V))*D_m;   % L_{t}
-P = Ppre - L*(C*Ppre);
+L = ((Ppre*C')/(C*Ppre*C'+V))*D_m_now;   % L_{t}
+P_global = Ppre - L*(C*Ppre);
 
 % propagate system
 I = eye(size(A));
-AAHat = [(I-L*C)*A,(I-L*C)*Bu*E*M*(eye(Np*Nu*Nv)-D_cHat);...
-    zeros(Nv*Np*Nu,Nx),M*(eye(Np*Nu*Nv)-D_cHat)];
-BUHat = [(I-L*C)*Bu*E*D_cHat;D_cHat];
-XHat = AAHat*XHat + BUHat*USent+[L;zeros(Np*Nu*Nv,size(yKF,1))]*yKF;
+AAHat = [(I-L*C)*A,...
+    (I-L*C)*Bu*E1*M1*(eye(Nhorizon*Nctrls*Nagents)-D_cHat_all);...
+    zeros(Nagents*Nhorizon*Nctrls,Nx),...
+    M1*(eye(Nhorizon*Nctrls*Nagents)-D_cHat_all)];
+BUHat = [(I-L*C)*Bu*E1*D_cHat_all;D_cHat_all];
+XHat_global = AAHat*XHat_global + BUHat*USent + ...
+    [L;zeros(Nhorizon*Nctrls*Nagents,size(yKF_in,1))]*yKF_in;
 
 end

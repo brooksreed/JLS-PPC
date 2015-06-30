@@ -107,12 +107,12 @@ end
 xHat1 = zeros(size(A,1),1);
 
 % random time-series realizations
-w = sqrt(W)*randn(size(Bw,2),Ns);
-v = sqrt(V)*randn(size(C,1),Ns);
+w = sqrt(W)*randn(size(Bw,2),simLength);
+v = sqrt(V)*randn(size(C,1),simLength);
 
 % packet loss sequences
-alpha_m = zeros(Nv,Ns);alpha_c = zeros(Nv,Ns);alpha_a = zeros(Nv,Ns);
-for k = 1:Ns
+alpha_m = zeros(Nv,simLength);alpha_c = zeros(Nv,simLength);alpha_a = zeros(Nv,simLength);
+for k = 1:simLength
     alpha_m(:,k) = (sign(rand(Nv,1) - (1-(alpha_mBar)))*0.5 + 0.5);
     alpha_c(:,k) = (sign(rand(Nv,1) - (1-(alpha_cBar)))*0.5 + 0.5);
     alpha_a(:,k) = (sign(rand(Nv,1) - (1-(alpha_aBar)))*0.5 + 0.5);
@@ -121,7 +121,7 @@ end
 %%%%%%%%%%%%%%%%%%
 
 if(strfind(sched,'piggyback'))
-    if(ta~=tm)
+    if(tau_a~=tau_m)
         disp('warning - resetting ta to tm')
         ta = tm;
     end
@@ -131,6 +131,6 @@ elseif(strfind(sched,'NoACK'))
 end
 
 % schedule time series
-[Pi_c,Pi_m,Pi_a,tac,Ts] = createSchedule(sched,Nv,Ns,tc);
+[Pi_c,Pi_m,Pi_a,tac,Ts] = createSchedule(sched,Nv,simLength,tau_c);
 Np = NpMult*Ts;
 

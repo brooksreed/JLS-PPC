@@ -8,13 +8,6 @@ function [Ps,PsFinal] = evaluatePstars(ab)
 
 % BR, 6/25/2015
 
-%{
-if(nStars>11)
-   disp('WARNING: Only nStars=10 supported, returning that')
-   nStars=11;
-end
-%}
-
 Ps(1) = - ab^4 + 2*ab^3 - 2*ab^2 + ab;
 PsFinal(1) = - ab^2 + ab;
 
@@ -45,11 +38,8 @@ PsFinal(9) = - ab^18 + 18*ab^17 - 153*ab^16 + 816*ab^15 - 3060*ab^14 + 8568*ab^1
 Ps(10) = - ab^22 + 20*ab^21 - 190*ab^20 + 1140*ab^19 - 4845*ab^18 + 15504*ab^17 - 38760*ab^16 + 77520*ab^15 - 125970*ab^14 + 167960*ab^13 - 184756*ab^12 + 167961*ab^11 - 125980*ab^10 + 77565*ab^9 - 38880*ab^8 + 15714*ab^7 - 5097*ab^6 + 1350*ab^5 - 310*ab^4 + 65*ab^3 - 11*ab^2 + ab;
 PsFinal(10) = - ab^20 + 20*ab^19 - 190*ab^18 + 1140*ab^17 - 4845*ab^16 + 15504*ab^15 - 38760*ab^14 + 77520*ab^13 - 125970*ab^12 + 167960*ab^11 - 184755*ab^10 + 167950*ab^9 - 125925*ab^8 + 77400*ab^7 - 38550*ab^6 + 15252*ab^5 - 4635*ab^4 + 1020*ab^3 - 145*ab^2 + 10*ab;
 
-%Ps(11) = 
 PsFinal(11) = - ab^22 + 22*ab^21 - 231*ab^20 + 1540*ab^19 - 7315*ab^18 + 26334*ab^17 - 74613*ab^16 + 170544*ab^15 - 319770*ab^14 + 497420*ab^13 - 646646*ab^12 + 705431*ab^11 - 646635*ab^10 + 497365*ab^9 - 319605*ab^8 + 170214*ab^7 - 74151*ab^6 + 25872*ab^5 - 6985*ab^4 + 1375*ab^3 - 176*ab^2 + 11*ab;
  
-%PsFinal(12) = 
-
 % Final term has different structure (pass both to KF, it handles)
 % PstarCoefficients = Ps(1:nStars-1);
 % PstarCoefficients(nStars) = PsFinal(nStars);

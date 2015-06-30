@@ -1,4 +1,4 @@
-function [XFwd,p_i] = prepMPC(t,Xh,U_in,D_cIn,Pi_c,...
+function [XFwd,p_i] = prepMPC(t_global,Xh_t,U_in_t,D_cIn_t,Pi_c_all,...
     A,Bu,E,M,Nx,Nv,Nu,Np,tm,tc)
 % propagate estimate fwd open-loop tm+tc steps using MJLS system
 %
@@ -14,13 +14,13 @@ function [XFwd,p_i] = prepMPC(t,Xh,U_in,D_cIn,Pi_c,...
 
 nFwds = tm+tc;
 XFwd = zeros(Nv*Np*Nu+Nx,nFwds+1);
-XFwd(:,1) = Xh;
+XFwd(:,1) = Xh_t;
 
 % moving fwd
 for i = 1:nFwds
     
-    UFwd = U_in(:,i);
-    D_cFwd = D_cIn(:,:,i);
+    UFwd = U_in_t(:,i);
+    D_cFwd = D_cIn_t(:,:,i);
     
     AAFwd = [A,Bu*E*M*(eye(Np*Nu*Nv)-D_cFwd);...
         zeros(Nv*Np*Nu,Nx),(eye(Np*Nu*Nv)-D_cFwd)*M];
@@ -32,7 +32,7 @@ end
 %%%%%%%%%%% compute k_p^i's
 p_i = zeros(Nv,1);
 for i = 1:Nv
-    iInds = find(Pi_c(i,(t):end)==1);
+    iInds = find(Pi_c_all(i,(t_global):end)==1);
     p_i(i) = iInds(1)-1;
 end
 
