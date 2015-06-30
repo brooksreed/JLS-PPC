@@ -1,4 +1,4 @@
-function plotJLSPPC_SISO(r)
+function [hf] = plotJLSPPC_SISO(r)
 % plots (for SISO systems)
 % r structure of results
 % also r.sys: system settings (only tc required right now)
@@ -20,12 +20,12 @@ plotLosses = 1; % plots packet losses for c, m (no a right now)
 NxSys = size(r.P,1);    % underlying system states (no buffer)
 Ns = size(r.X,2);
 
-figure
+hf = figure;
 
 subplot(3,1,[1 2])
 hx = plot(0:Ns-1,CPlot*r.X(1:NxSys,:));
 hold on
-hxh = plot(0:Ns-1,CPlot*r.Xh(1:NxSys,:),'g.:');
+hxh = plot(0:Ns-1,CPlot*r.Xh(1:NxSys,:),'g.--');
 %title(sprintf('integrator sys, alphaBar = %0.2f, W=%.1f, V=%.1f',alpha_cBar,W,V))
 
 hb=[];hc=[];
