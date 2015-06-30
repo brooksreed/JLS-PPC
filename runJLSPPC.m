@@ -102,8 +102,8 @@ if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
     
     Nv = 1;
     alpha_cBar = .75; % controls
-    alpha_mBar = .7;  % measurements
-    alpha_aBar = .7; % ACKs (if piggyback used, betaBar overrides gammaBar)
+    alpha_mBar = .75;  % measurements
+    alpha_aBar = .75; % ACKs (if piggyback used, betaBar overrides gammaBar)
     
 else
     

@@ -38,7 +38,7 @@ Ny = NY/Nv;
 tNoACK = zeros(Nv,Ns);
 
 % If initial controls unknown
-tNoACK(:,1:Ns) = 1:Ns;
+tNoACK(:,1:Ns) = repmat(1:Ns,[Nv,1]);
 
 % after first planned control RX, unknown
 % initialize based on 2nd pi_c + tau_c ?? (need tau_ac too?)
