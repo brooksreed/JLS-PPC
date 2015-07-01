@@ -87,10 +87,10 @@ switch system
 end
 
 % check
-if( length(alpha_cBar)~=N_VEH )
+if( length(ALPHAC_BAR)~=N_VEH )
     disp('WARNING: alpha_c, Nv mismatch')
 end
-if( length(alpha_mBar)~=N_VEH )
+if( length(ALPHAM_BAR)~=N_VEH )
     disp('WARNING: alpha_m, Nv mismatch')
 end
 if( rem(size(C,1),N_VEH) )
@@ -111,7 +111,7 @@ v = sqrt(V)*randn(size(C,1),SIM_LENGTH);
 alpha_m = zeros(N_VEH,SIM_LENGTH);
 alpha_c = zeros(N_VEH,SIM_LENGTH);
 alpha_a = zeros(N_VEH,SIM_LENGTH);
-for k = 1:simLength
+for k = 1:SIM_LENGTH
     alpha_m(:,k) = (sign(rand(N_VEH,1) - (1-(ALPHAM_BAR)))*0.5 + 0.5);
     alpha_c(:,k) = (sign(rand(N_VEH,1) - (1-(ALPHAC_BAR)))*0.5 + 0.5);
     alpha_a(:,k) = (sign(rand(N_VEH,1) - (1-(ALPHAA_BAR)))*0.5 + 0.5);
@@ -131,5 +131,5 @@ end
 
 % schedule time series
 [PI_C,PI_M,PI_A,TAU_AC,T_S] = createSchedule(sched,N_VEH,SIM_LENGTH,TAU_C);
-N_p = Np_mult*T_S;
+N_HORIZON = N_HORIZON_MULT*T_S;
 

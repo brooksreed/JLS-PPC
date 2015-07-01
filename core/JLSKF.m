@@ -1,10 +1,10 @@
-function [XHat_out,P_out] = JLSKF(XHat_in,P_in,y_KF,...
-    U_sent,Dc_hat_all,N_STATES,N_AGENTS,N_CONTROLS,N_p,Dm_now,...
-    A,Bu,E,M,C,W,V,ALPHAC_BAR,cov,pd)
+function [XHat_out,P_out] = JLSKF(XHat_in,P_in,y_KF,U_sent,Dc_hat_all,...
+    N_STATES,N_AGENTS,N_CONTROLS,N_HORIZON,Dm_now,A,Bu,E,M,C,W,V,...
+    ALPHAC_BAR,cov,pd)
 % Kalman filter for missed measurements and controls
-% [XHat_out,P_out] = JLSKF(XHat_in,P_in,y_KF,...
-%     U_sent,Dc_hat_all,N_STATES,N_AGENTS,N_CONTROLS,N_p,Dm_now,...
-%     A,Bu,E,M,C,W,V,ALPHAC_BAR,cov,pd)
+% [XHat_out,P_out] = JLSKF(XHat_in,P_in,y_KF,U_sent,Dc_hat_all,...
+%     N_STATES,N_AGENTS,N_CONTROLS,N_HORIZON,Dm_now,A,Bu,E,M,C,W,V,...
+%     ALPHAC_BAR,cov,pd)
 % XHat is state estimate (system + buffer), all time steps
 % P is error cov., all time steps
 % y_KF: meas into KF
@@ -40,9 +40,9 @@ elseif(isempty(cov) || cov==0)
     cov_prior_adj = 0;
 end
 
-if(isstruct(pd))
+if( isstruct(pd) )
     t = pd.t; t_KF = pd.t_KF;
-    print_debug_kf=1;
+    print_debug_kf = 1;
 elseif(isempty(pd) || pd==0)
     print_debug_kf = 0;
 end
@@ -134,9 +134,10 @@ if( cov_prior_adj && (max(t_NoACK)>0) )
         
         P_pre = P_pre_0 + Pstar;
         
-        
-        fprintf('\nt=%d, KF tKF=%d, MIMO P*: \n',t,t_KF)
-        disp(Pstar)
+        if(print_debug_kf)
+            fprintf('\nt=%d, KF tKF=%d, MIMO P*: \n',t,t_KF)
+            disp(Pstar)
+        end
         
         
     end
@@ -153,11 +154,11 @@ P_out = P_pre - L*(C*P_pre);
 % propagate system
 I = eye(size(A));
 AAHat = [(I-L*C)*A,...
-    (I-L*C)*Bu*E*M*(eye(N_p*N_CONTROLS*N_AGENTS)-Dc_hat_all);...
-    zeros(N_AGENTS*N_p*N_CONTROLS,N_STATES),...
-    M*(eye(N_p*N_CONTROLS*N_AGENTS)-Dc_hat_all)];
+    (I-L*C)*Bu*E*M*(eye(N_HORIZON*N_CONTROLS*N_AGENTS)-Dc_hat_all);...
+    zeros(N_AGENTS*N_HORIZON*N_CONTROLS,N_STATES),...
+    M*(eye(N_HORIZON*N_CONTROLS*N_AGENTS)-Dc_hat_all)];
 BUHat = [(I-L*C)*Bu*E*Dc_hat_all;Dc_hat_all];
 XHat_out = AAHat*XHat_in + BUHat*U_sent + ...
-    [L;zeros(N_p*N_CONTROLS*N_AGENTS,size(y_KF,1))]*y_KF;
+    [L;zeros(N_HORIZON*N_CONTROLS*N_AGENTS,size(y_KF,1))]*y_KF;
 
 end

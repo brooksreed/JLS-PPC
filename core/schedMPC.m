@@ -1,18 +1,18 @@
 function [U,cost,status,X_Out,violate_slack] = schedMPC(x_In,...
-            b_hat_MPC,p_i,MPC_horizon,A,Bu,M,E,Q,Qf,R,...
+            b_hat_MPC,p_i,N_HORIZON,A,Bu,M,E,Q,Qf,R,...
             umax,umin,xmin,xmax,u_deadband)
 % solve deterministic scheduled MPC with cvx 
 % [U,cost,status,X_Out,violate_slack] = schedMPC(x_In,...
-%             b_hat_MPC,p_i,MPC_horizon,A,Bu,M,E,Q,Qf,R,...
+%             b_hat_MPC,p_i,N_HORIZON,A,Bu,M,E,Q,Qf,R,...
 %             umax,umin,xmin,xmax,u_deadband)
 % x_In(N_STATES x 1):  x_hat{t+TAU_C|t-TAU_M},
-% b_hat_MPC(N_VEH*N_CONTROLS*horizon x 1): b_hat{t+TAU_C-1}
+% b_hat_MPC(N_VEH*N_CONTROLS*N_HORIZON x 1): b_hat{t+TAU_C-1}
 % p_i (Nv x 1) vector of #steps to constrain control priors 
-% horizon: scalar
+% N_HORIZON: scalar horizon length
 % A,Bu: system
 % M, E: buffer shift
 % Q, Qf, R: cost function params (states, terminal states, controls)
-% umax, umin: (Nu x horizon) control constraints
+% umax, umin: (Nu x N_HORIZON) control constraints
 % xmin and xmax are optional, default is none
 % state constraints implemented with slack variable "barrier"
 % uDB is deadband width (NOTE - this makes MPC very slow, requires MIQP
@@ -47,10 +47,10 @@ if(isempty(umax) || isempty(umin) )
 else
     controlConstraints = 1;
     if(size(umin,2)==1)
-        umin = repmat(umin,[1,MPC_horizon]);
+        umin = repmat(umin,[1,N_HORIZON]);
     end
     if(size(umax,2)==1)
-        umax = repmat(umax,[1,MPC_horizon]);
+        umax = repmat(umax,[1,N_HORIZON]);
     end
 end
 
@@ -59,7 +59,7 @@ if(isempty(u_deadband))
 else
     use_deadband = 1;
     if(size(u_deadband,2)==1)
-        u_deadband = repmat(u_deadband,[1,MPC_horizon]);
+        u_deadband = repmat(u_deadband,[1,N_HORIZON]);
     end
 end
 
@@ -71,14 +71,14 @@ else
 end
 
 N_U = size(Bu,2); 
-N_x = size(A,1);
+N_STATES = size(A,1);
 N_v = length(p_i);
 N_u = N_U/N_v;
 
-blockQ = kron(eye(MPC_horizon),Q);
-blockQ((MPC_horizon*N_x-N_x+1):MPC_horizon*N_x,...
-    (MPC_horizon*N_x-N_x+1):MPC_horizon*N_x) = Qf;
-blockR = kron(eye(MPC_horizon),R);
+blockQ = kron(eye(N_HORIZON),Q);
+blockQ((N_HORIZON*N_STATES-N_STATES+1):N_HORIZON*N_STATES,...
+    (N_HORIZON*N_STATES-N_STATES+1):N_HORIZON*N_STATES) = Qf;
+blockR = kron(eye(N_HORIZON),R);
 
 cvx_clear
 cvx_begin 
@@ -91,17 +91,17 @@ end
 cvx_quiet(true)
 
 if(state_constraints)
-    variable X(Nx,horizon+1) 
-    variable U(NU,horizon) 
-    variable violate_slack1(Nx,horizon+1) 
-    variable violate_slack2(Nx,horizon+1) 
-    variable d1(NU,horizon) binary
-    variable d2(NU,horizon) binary
+    variable X(N_STATES,N_HORIZON+1) 
+    variable U(N_U,N_HORIZON) 
+    variable violate_slack1(N_STATES,N_HORIZON+1) 
+    variable violate_slack2(N_STATES,N_HORIZON+1) 
+    variable d1(N_U,N_HORIZON) binary
+    variable d2(N_U,N_HORIZON) binary
 else
-    variable X(Nx,horizon+1) 
-    variable U(NU,horizon) 
-    variable d1(NU,horizon) binary
-    variable d2(NU,horizon) binary
+    variable X(N_STATES,N_HORIZON+1) 
+    variable U(N_U,N_HORIZON) 
+    variable d1(N_U,N_HORIZON) binary
+    variable d2(N_U,N_HORIZON) binary
 end
 
 % control constraints
@@ -148,11 +148,11 @@ if(state_constraints)
     
 end
 
-X(:,2:MPC_horizon+1) == A*X(:,1:MPC_horizon)+Bu*U;
+X(:,2:N_HORIZON+1) == A*X(:,1:N_HORIZON)+Bu*U;
 X(:,1) == x_In; 
 
-x = reshape(X(:,2:end),MPC_horizon*N_x,1);
-u = reshape(U,MPC_horizon*N_U,1);
+x = reshape(X(:,2:end),N_HORIZON*N_STATES,1);
+u = reshape(U,N_HORIZON*N_U,1);
 if(state_constraints)        
     minimize( x'*blockQ*x + u'*blockR*u + ...
         1e8*sum(sum(violateSlack1 + violateSlack2)) )
@@ -165,10 +165,10 @@ status = cvx_status;
 
 % compute "predicted" cost 
 jd = 0;
-for kk = 2:MPC_horizon
+for kk = 2:N_HORIZON
     jd = jd + X(:,kk)'*Q*X(:,kk) + U(:,kk-1)'*R*U(:,kk-1);
 end
-jd = jd + X(:,MPC_horizon+1)'*Qf*X(:,MPC_horizon+1);
+jd = jd + X(:,N_HORIZON+1)'*Qf*X(:,N_HORIZON+1);
 cost = jd;
 
 % plan doesn't include 1st step (xIn)
@@ -176,7 +176,7 @@ X_Out = X(:,2:end);
 
 if(state_constraints)
     % constraint violations don't either
-    violate_slack = zeros(N_x,MPC_horizon,2);
+    violate_slack = zeros(N_STATES,N_HORIZON,2);
     violate_slack(:,:,1) = violate_slack1(:,2:end);
     violate_slack(:,:,2) = violate_slack2(:,2:end);
 end

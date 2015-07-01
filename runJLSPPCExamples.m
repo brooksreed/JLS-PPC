@@ -14,17 +14,6 @@
 % v1.1 6/16/2015
 
 
-% TO DO:
-
-% clean up/separate inputs vs. other?
-% one toggle for 'debugging mode'?
-% more detailed plots for SISO
-
-% MIMO cleaner system setup, make Nc and Nm vs. Nv?
-% MIMO basic plots
-% MIMO Pstar - ambiguity with partial ACKs
-
-% automated saving/logging?
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -39,10 +28,10 @@ print_debug = 1;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % SIM LENGTH
-SIM_LEN = 20; % sim length
+SIM_LENGTH = 20; % sim length
 
 % MPC HORIZON:
-Np_mult = 4; % the MPC horizon Np = Ts*NpMult
+N_HORIZON_MULT = 4; % the MPC horizon Np = Ts*NpMult
 
 %%%%%%%%%%%
 % SYSTEM (set up in setupSystemJPLPPC)
@@ -91,9 +80,9 @@ TAU_A = 1; % ACK delay
 % ACK SETTINGS
 % # ACK Histories sent (makes most sense to be multiple of schedule length)
 % For 'SINGLE ACK': sys nACKHistory = Ts (schedule length)
-N_ACKHISTORY = 5;
+N_ACKHISTORY = 2;
 % adjustment to covariance priors due to no ACKs/control losses:
-cov_prior_adj = 1;
+cov_prior_adj = 0;
 
 %%%%%%%%%%%%%
 % PACKET SUCCESS PROBABILITIES
@@ -101,22 +90,22 @@ cov_prior_adj = 1;
 % Nv is number of control AND meas channels (asymmetric # not implemented)
 if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
     
-    Nv = 1;
+    N_VEH = 1;
     ALPHAC_BAR = .75; % controls
     ALPHAM_BAR = .75;  % measurements
     ALPHAA_BAR = .75; % ACKs (if piggyback used, betaBar overrides gammaBar)
     
 else
     
-    Nv = 2;
+    N_VEH = 2;
     
     %ALPHAC_BAR = [.75;.75];
     %ALPHAM_BAR = [.75;.75];
     %ALPHAA_BAR = [.75;.75];
     
-    ALPHAC_BAR = .75*ones(Nv,1);
-    ALPHAM_BAR = .75*ones(Nv,1);
-    ALPHAA_BAR = .75*ones(Nv,1);
+    ALPHAC_BAR = .75*ones(N_VEH,1);
+    ALPHAM_BAR = .75*ones(N_VEH,1);
+    ALPHAA_BAR = .75*ones(N_VEH,1);
     
 end
 
@@ -142,10 +131,10 @@ end
 
 %% call sim fcn
 
-[r] = simJLSPPC(SIM_LEN,N_p,A,Bu,Bw,C,Q,Qf,R,W,V,TAU_M,TAU_C,TAU_A,...
-    TAU_AC,ALPHAC_BAR,PI_C,PI_M,PI_A,T_S,U_MAX,U_MIN,CODEBOOK,Xmax,...
-    Xmin,x_IC,P_1,x_hat_1,w,v,alpha_c,alpha_m,alpha_a,cov_prior_adj,...
-    N_ACKHISTORY,print_debug);
+[r] = simJLSPPC(SIM_LENGTH,N_HORIZON,A,Bu,Bw,C,Q,Qf,R,W,V,TAU_M,TAU_C,...
+    TAU_A,TAU_AC,ALPHAC_BAR,PI_C,PI_M,PI_A,T_S,U_MAX,U_MIN,CODEBOOK,...
+    Xmax,Xmin,x_IC,P_1,x_hat_1,w,v,alpha_c,alpha_m,alpha_a,...
+    cov_prior_adj,N_ACKHISTORY,print_debug);
 r.sys.sched = sched;
 r.sys.system =system;
 r.sys.ALPHAM_BAR = ALPHAM_BAR;
@@ -176,19 +165,19 @@ else
     % very simple MIMO plot:
     
     NX_SYS = size(r.P,1);    % underlying system states (no buffer)
-    SIM_LEN = size(r.X,2);
+    SIM_LENGTH = size(r.X,2);
     
     CPlot = r.sys.C;
     figure
     subplot(3,1,[1 2])
-    hx = plot(0:SIM_LEN-1,CPlot*r.X(1:NX_SYS,:));
+    hx = plot(0:SIM_LENGTH-1,CPlot*r.X(1:NX_SYS,:));
     hold on
-    hxh = plot(0:SIM_LEN-1,CPlot*r.Xh(1:NX_SYS,:),':');
+    hxh = plot(0:SIM_LENGTH-1,CPlot*r.Xh(1:NX_SYS,:),':');
     legend([hx(1) hxh(1)],'X','XHat')
     title('MIMO System (colors are i/o channels)')
     
     subplot(3,1,3)
-    hu = stairs(repmat(0:SIM_LEN-1,[2,1])',r.u');
+    hu = stairs(repmat(0:SIM_LENGTH-1,[2,1])',r.u');
     xlabel('time step')
     ylabel('u')
     

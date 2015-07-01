@@ -1,12 +1,12 @@
-function [results] = simJLSPPC(SIM_LEN,N_p,A_SYS,Bu_SYS,Bw_SYS,C_SYS,...
-    QMPC,QfMPC,RMPC,W_KF,V_KF,TAU_M,TAU_C,TAU_A,TAU_AC,ALPHAC_BAR,...
+function [results] = simJLSPPC(SIM_LEN,N_HORIZON,A_SYS,Bu_SYS,Bw_SYS,...
+    C_SYS,QMPC,QfMPC,RMPC,W_KF,V_KF,TAU_M,TAU_C,TAU_A,TAU_AC,ALPHAC_BAR,...
     PI_C,PI_M,PI_A,T_S,U_MAX,U_MIN,CODEBOOK,XMAX,XMIN,X_IC,P_1,X_HAT1,...
     w_t,v_t,alpha_c,alpha_m,alpha_a,cov_prior_adj,N_ACKHISTORY,print_debug)
-% runs simulation of MJLS/scheduled PPC
-% [results] = simJLSPPC(Ns,Np,Asys,Busys,Bwsys,Csys,...
-%     QMPC,QfMPC,RMPC,WKF,VKF,tm,tc,ta,tac,acBar,Pi_c,Pi_m,Pi_a,Ts,...
-%     umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,w,v,a_c,a_m,a_a,...
-%     covPriorAdj,nACKHistory,printDebug)
+% runs simulation of JLSPPC
+% [results] = simJLSPPC(SIM_LEN,N_HORIZON,A_SYS,Bu_SYS,Bw_SYS,C_SYS,...
+%    QMPC,QfMPC,RMPC,W_KF,V_KF,TAU_M,TAU_C,TAU_A,TAU_AC,ALPHAC_BAR,...
+%    PI_C,PI_M,PI_A,T_S,U_MAX,U_MIN,CODEBOOK,XMAX,XMIN,X_IC,P_1,X_HAT1,...
+%    w_t,v_t,alpha_c,alpha_m,alpha_a,cov_prior_adj,N_ACKHISTORY,print_debug)
 %
 % inputs approximately match variables in paper
 % covPriorAdj = {1,0} toggle for using cov. prior adjustments in KF
@@ -14,15 +14,11 @@ function [results] = simJLSPPC(SIM_LEN,N_p,A_SYS,Bu_SYS,Bw_SYS,C_SYS,...
 % results: large struct of results
 
 % BR, 4/23/2014
-% modifying for delayed ACKs, 6/13/2014
-% v1.0 6/13/2015
-% v1.1 6/16/2015
 
 % TO DO:
-% Clean up printouts?
 % Make sure prep for KF is ready for MIMO and multiple P*s
 % Add logging of P*, P**, etc.?
-% Add more automated tests/checks?
+% Add more tests/checks?
 
 
 % INITIALIZATION
@@ -76,50 +72,50 @@ end
 
 % turn control constraints into time series
 % (could be run with time-varying if desired)
-U_MAX_T = repmat(U_MAX,1,SIM_LEN+N_p);
-U_MIN_T = repmat(U_MIN,1,SIM_LEN+N_p);
+U_MAX_T = repmat(U_MAX,1,SIM_LEN+N_HORIZON);
+U_MIN_T = repmat(U_MIN,1,SIM_LEN+N_HORIZON);
 
 % Nearest-Neighbor quantizer: make partition
 if(~ischar(CODEBOOK))
-    partition = ( CODEBOOK(2:end)+CODEBOOK(1:(end-1)) )/2;
+    PARTITION = ( CODEBOOK(2:end)+CODEBOOK(1:(end-1)) )/2;
 end
 
 % various sytem inits/preallocations
-M = makeM(N_CONTROLS_VEH,N_p,N_VEH);
-etmp = [1,zeros(1,N_p-1)];
+M = makeM(N_CONTROLS_VEH,N_HORIZON,N_VEH);
+etmp = [1,zeros(1,N_HORIZON-1)];
 E = kron(eye(N_VEH),kron(etmp,eye(N_CONTROLS_VEH)));
-BW = [Bw_SYS;zeros(N_CONTROLS_VEH*N_p*N_VEH,N_W)];
+BW = [Bw_SYS;zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,N_W)];
 
-X = zeros(NX_SYS+N_CONTROLS_VEH*N_p*N_VEH,SIM_LEN);        % includes x and b
+X = zeros(NX_SYS+N_CONTROLS_VEH*N_HORIZON*N_VEH,SIM_LEN);     % includes x and b
 y = zeros(N_Y_ALL,SIM_LEN);                             % true y 
 yh = zeros(N_Y_ALL,SIM_LEN);                            % y into estimator 
-Xh = NaN*zeros(NX_SYS+N_CONTROLS_VEH*N_p*N_VEH,SIM_LEN);   % includes xHat and bHat
+Xh = NaN*zeros(NX_SYS+N_CONTROLS_VEH*N_HORIZON*N_VEH,SIM_LEN);   % includes xHat and bHat
 P = zeros(NX_SYS,NX_SYS,SIM_LEN);
 u = zeros(N_CONTROLS_ALL,SIM_LEN);
-U = zeros(N_CONTROLS_VEH*N_p*N_VEH,SIM_LEN);
+U = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,SIM_LEN);
 
 % initialize jump variable matrices
-Dc = zeros(N_CONTROLS_VEH*N_p*N_VEH,N_CONTROLS_VEH*N_p*N_VEH,SIM_LEN);    
+Dc = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,N_CONTROLS_VEH*N_HORIZON*N_VEH,SIM_LEN);    
 Dm = zeros(N_VEH*N_Y_VEH,N_VEH*N_Y_VEH,SIM_LEN);
 Da = zeros(N_VEH,N_VEH,SIM_LEN);
 
 % estimated alpha_c, Dc, no loss controls/buffers
-Dc_hat = zeros(N_CONTROLS_VEH*N_p*N_VEH,N_CONTROLS_VEH*N_p*N_VEH,SIM_LEN+TAU_C);   
-Dc_no_loss = zeros(N_CONTROLS_VEH*N_p*N_VEH,N_CONTROLS_VEH*N_p*N_VEH,SIM_LEN+TAU_C);   
+Dc_hat = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,N_CONTROLS_VEH*N_HORIZON*N_VEH,SIM_LEN+TAU_C);   
+Dc_no_loss = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,N_CONTROLS_VEH*N_HORIZON*N_VEH,SIM_LEN+TAU_C);   
 alphac_hat = repmat(ALPHAC_BAR,[1 SIM_LEN]);
 for t = (TAU_C+1):SIM_LEN
-    Dc_hat(:,:,t) = makeDc(PI_C(:,t-TAU_C),alphac_hat(:,t-TAU_C),N_CONTROLS_VEH,N_p);
-    Dc_no_loss(:,:,t) = makeDc(PI_C(:,t-TAU_C),PI_C(:,t-TAU_C),N_CONTROLS_VEH,N_p);
+    Dc_hat(:,:,t) = makeDc(PI_C(:,t-TAU_C),alphac_hat(:,t-TAU_C),N_CONTROLS_VEH,N_HORIZON);
+    Dc_no_loss(:,:,t) = makeDc(PI_C(:,t-TAU_C),PI_C(:,t-TAU_C),N_CONTROLS_VEH,N_HORIZON);
 end
 u_no_loss = zeros(N_CONTROLS_ALL,SIM_LEN);
-b_no_loss = zeros(N_CONTROLS_VEH*N_p*N_VEH,SIM_LEN);
+b_no_loss = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,SIM_LEN);
 
 % includes xHatMPC and bHatMPC
-XhMPC = NaN*zeros(N_VEH*N_p*N_CONTROLS_VEH+NX_SYS,TAU_M+TAU_C+1,SIM_LEN);	
+XhMPC = NaN*zeros(N_VEH*N_HORIZON*N_CONTROLS_VEH+NX_SYS,TAU_M+TAU_C+1,SIM_LEN);	
 
 % variables for saving MPC output/timing
 Jcomp = NaN*zeros(1,SIM_LEN);
-X_plan = NaN*zeros(NX_SYS,N_p,SIM_LEN);
+X_plan = NaN*zeros(NX_SYS,N_HORIZON,SIM_LEN);
 MPC_time = NaN*zeros(SIM_LEN,1);
 loop_time = zeros(SIM_LEN,1);
 MPC_fail = zeros(SIM_LEN,1);
@@ -129,7 +125,7 @@ X(1:NX_SYS,1) = X_IC;
 y(:,1) = C_SYS*X_IC+v_t(:,1);
 
 % initial buffer - all zeros
-X(NX_SYS+1:end,1) = zeros(N_CONTROLS_VEH*N_p*N_VEH,1);
+X(NX_SYS+1:end,1) = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,1);
 
 % first step propagation - gives x_2
 X(1:NX_SYS,2) =  A_SYS*X_IC + w_t(:,1);
@@ -142,7 +138,7 @@ for t = (TAU_M+1):(SIM_LEN-1)
     
     % determine which measurements are available at estimator at this step
     % at step t, meas. are sent at t-tm
-    Dm(:,:,t-TAU_M) = makeD_m(PI_M(:,t-TAU_M),alpha_m(:,t-TAU_M),N_Y_VEH);
+    Dm(:,:,t-TAU_M) = makeDm(PI_M(:,t-TAU_M),alpha_m(:,t-TAU_M),N_Y_VEH);
     yh(:,t-TAU_M) = Dm(:,:,t-TAU_M)*y(:,t-TAU_M);     
     
     if(print_debug)
@@ -161,7 +157,7 @@ for t = (TAU_M+1):(SIM_LEN-1)
     % also increments a lookahead of tNoACK(t-ta+1 --> future)
     [Dc_hat,alphac_hat,Da,KF_start,t_NoACK,~] = JLSJumpEstimator(Dc_hat,...
         PI_C,Da,alpha_c,alphac_hat,PI_A,T_S,alpha_a,t,TAU_M,TAU_C,...
-        TAU_A,TAU_AC,N_CONTROLS_VEH,N_p,t_NoACK,N_ACKHISTORY,print_debug);
+        TAU_A,TAU_AC,N_CONTROLS_VEH,N_HORIZON,t_NoACK,N_ACKHISTORY,print_debug);
     t_NoACKSave{t} = t_NoACK;
     
     if(print_debug)
@@ -182,9 +178,9 @@ for t = (TAU_M+1):(SIM_LEN-1)
         if(t-TAU_M-1>1)
             b_prev = b_no_loss(:,t-TAU_M-2);
         else
-            b_prev = zeros(N_CONTROLS_VEH*N_p*N_VEH,1);
+            b_prev = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,1);
         end
-        b_no_loss(:,t-TAU_M-1) = M*(eye(N_p*N_CONTROLS_VEH*N_VEH)-Dc_no_loss...
+        b_no_loss(:,t-TAU_M-1) = M*(eye(N_HORIZON*N_CONTROLS_VEH*N_VEH)-Dc_no_loss...
             (:,:,t-TAU_M-1))*b_prev + Dc_no_loss(:,:,t-TAU_M-1)*...
             U(:,t-TAU_M-1);
         u_no_loss(:,t-TAU_M-1) = E*b_no_loss(:,t-TAU_M-1);
@@ -197,7 +193,7 @@ for t = (TAU_M+1):(SIM_LEN-1)
                         
             % determine tNoACK vector for specific filter step
             if(N_VEH==1)
-                if(t_KF-1-TAU_AC>0)
+                if( (t_KF+TAU_AC-1)>0 )
                     t_NoACK_KF = t_NoACK(1,t_KF+TAU_AC-1);
                 else
                     t_NoACK_KF = 1;
@@ -227,7 +223,7 @@ for t = (TAU_M+1):(SIM_LEN-1)
             u_options = zeros(N_CONTROLS_ALL,t_NoACK_KF);
             for k = 1:t_NoACK_KF
                 if(t_KF-k<1)
-                    bTMP = zeros(N_CONTROLS_VEH*N_p*N_VEH,1);
+                    bTMP = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,1);
                 else
                     bTMP = b_no_loss(:,t_KF-k);
                 end
@@ -243,10 +239,10 @@ for t = (TAU_M+1):(SIM_LEN-1)
         
         if(t_KF<=1)
             A_KF = eye(size(A_SYS));
-            Dc_KF_hat = makeD_c(zeros(N_VEH,1),zeros(N_VEH,1),N_CONTROLS_VEH,N_p);
-            Xh_in = [X_HAT1;zeros(N_CONTROLS_VEH*N_p*N_VEH,1)];
+            Dc_KF_hat = makeDc(zeros(N_VEH,1),zeros(N_VEH,1),N_CONTROLS_VEH,N_HORIZON);
+            Xh_in = [X_HAT1;zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,1)];
             P_in = P_1;
-            U_in = zeros(N_CONTROLS_VEH*N_p*N_VEH,1);
+            U_in = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,1);
             y_in = yh(:,1);
             Dm_in = Dm(:,:,1);
         else
@@ -268,12 +264,12 @@ for t = (TAU_M+1):(SIM_LEN-1)
         
         print_debug_KF=0;
         if(print_debug_KF~=0)
-            print_debug_KF.t = t;print_debug_KF.t_KF = t_KF;
+            print_debug_KF.t = t; print_debug_KF.t_KF = t_KF;
         end
             
         % Xh(:,t-tm): xHat_{t-tm|t-tm},bHat_{t-tm-1}
         [Xh(:,t_KF),P(:,:,t_KF)] = JLSKF(Xh_in,P_in,y_in,U_in,Dc_KF_hat,...
-            NX_SYS,N_VEH,N_CONTROLS_VEH,N_p,Dm_in,A_KF,Bu_SYS,E,M,C_SYS,...
+            NX_SYS,N_VEH,N_CONTROLS_VEH,N_HORIZON,Dm_in,A_KF,Bu_SYS,E,M,C_SYS,...
             W_KF,V_KF,ALPHAC_BAR,cov,print_debug_KF);
         
         if(print_debug)
@@ -308,7 +304,7 @@ for t = (TAU_M+1):(SIM_LEN-1)
         
         % grab constraints (to accommodate time-varying)
         [u_max,u_min,xmax,xmin] = paramsNow(U_MAX_T,U_MIN_T,XMAX,XMIN,...
-            t+1,N_p);
+            t+1,N_HORIZON);
         
         % Forward propagation: XhMPC and k_p^i's
         % starts with Xh: xHat_{t-tm|t-tm}, bHat_{t-tm-1}
@@ -319,11 +315,11 @@ for t = (TAU_M+1):(SIM_LEN-1)
         U_fwd = U(:,(t-TAU_M):(t+TAU_C-1));
         D_fwd = Dc_hat(:,:,(t-TAU_M):(t+TAU_C-1));
         [XhMPC(:,:,t+TAU_C),p_i] = prepMPC(t,Xh(:,t-TAU_M),U_fwd,D_fwd,...
-            PI_C,A_SYS,Bu_SYS,E,M,NX_SYS,N_VEH,N_CONTROLS_VEH,N_p,TAU_M,TAU_C);
+            PI_C,A_SYS,Bu_SYS,E,M,NX_SYS,N_VEH,N_CONTROLS_VEH,N_HORIZON,TAU_M,TAU_C);
               
         solve_status = 0;
         counter = 1;
-        T_MPC = N_p;
+        T_MPC = N_HORIZON;
         while(solve_status==0)
             
             % compute U_{t+tc}^i, forall i s.t. {Pi_c(i,t) = 1}
@@ -351,27 +347,27 @@ for t = (TAU_M+1):(SIM_LEN-1)
             counter = counter+1;
             if(counter>2)
                 disp('MAXCOUNTER')
-                U_MPC = zeros(N_CONTROLS_ALL,N_p);
+                U_MPC = zeros(N_CONTROLS_ALL,N_HORIZON);
                 MPC_fail(t) = 1;
                 break
             end
             
         end
-        U_MPC = U_MPC(:,1:N_p);    % truncate if TMPC>Np
-        X_plan(:,:,t) = X_plan(:,1:N_p);
+        U_MPC = U_MPC(:,1:N_HORIZON);    % truncate if TMPC>Np
+        X_plan(:,:,t) = X_plan(:,1:N_HORIZON);
         
         MPC_time(t) = toc(MPCtic);
         
     else % (for saving - make clear not set)
         
-        U_MPC = zeros(N_CONTROLS_ALL,N_p);
+        U_MPC = zeros(N_CONTROLS_ALL,N_HORIZON);
         
     end
     
     % translate (NU x Np Umpc) into buffer shape Nu x Np x Nv
-    U_vec = reshape(U_MPC',[N_CONTROLS_VEH*N_p*N_VEH,1]);
+    U_vec = reshape(U_MPC',[N_CONTROLS_VEH*N_HORIZON*N_VEH,1]);
     if(isempty(strfind(CODEBOOK,'none')))
-        [~,U(:,t+TAU_C)] = quantiz(U_vec,partition,CODEBOOK);
+        [~,U(:,t+TAU_C)] = quantiz(U_vec,PARTITION,CODEBOOK);
     elseif(strfind(CODEBOOK,'none'))
         U(:,t+TAU_C) = U_vec;
     end
@@ -379,13 +375,13 @@ for t = (TAU_M+1):(SIM_LEN-1)
     % true system propagation
     % reshape into MJLS form (for step t), uses D_t(pi(t-tc),alpha_c(t-tc))
     if(t<=TAU_C)
-        Dc(:,:,t) = makeD_c(zeros(1,N_VEH),zeros(1,N_VEH),N_CONTROLS_VEH,N_p);
+        Dc(:,:,t) = makeDc(zeros(1,N_VEH),zeros(1,N_VEH),N_CONTROLS_VEH,N_HORIZON);
     else
-        Dc(:,:,t) = makeD_c(PI_C(:,t-TAU_C),alpha_c(:,t-TAU_C),...
-            N_CONTROLS_VEH,N_p);
+        Dc(:,:,t) = makeDc(PI_C(:,t-TAU_C),alpha_c(:,t-TAU_C),...
+            N_CONTROLS_VEH,N_HORIZON);
     end
     I = eye(size(Dc(:,:,1)));
-    AA = [A_SYS,Bu_SYS*E*M*(I-Dc(:,:,t));zeros(N_VEH*N_p*N_CONTROLS_VEH,...
+    AA = [A_SYS,Bu_SYS*E*M*(I-Dc(:,:,t));zeros(N_VEH*N_HORIZON*N_CONTROLS_VEH,...
         NX_SYS),M*(I-Dc(:,:,t))];
     BU = [Bu_SYS*E*Dc(:,:,t);Dc(:,:,t)];
     
@@ -460,7 +456,7 @@ sys.U_MIN = U_MIN;
 sys.Q = QMPC;
 sys.Qf = QfMPC;
 sys.R = RMPC;
-sys.N_p = N_p;
+sys.N_p = N_HORIZON;
 sys.W = W_KF;
 sys.V = V_KF;
 sys.alphac_bar = ALPHAC_BAR;

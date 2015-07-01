@@ -164,12 +164,12 @@ TAU_AC = zeros(N_VEH,1);
 if(isempty(strfind(sched,'noACK')))
     for i = 1:N_VEH
         Pi_c_positive = find(Pi_c_base(i,:)) + TAU_C;   
-        Pi_a_ = find(Pi_a_base(i,:));
-        if(Pi_c_positive>Pi_aPos)
-            Pi_aPos = Pi_aPos + T_S;
+        Pi_a_positive = find(Pi_a_base(i,:));
+        if(Pi_c_positive>Pi_a_positive)
+            Pi_a_positive = Pi_a_positive + T_S;
         end
         try
-            TAU_AC(i) = Pi_aPos - Pi_c_positive;
+            TAU_AC(i) = Pi_a_positive - Pi_c_positive;
         catch
             % (SISO2ALLCONTROL -- fix eventually)
             TAU_AC(i) = 0;

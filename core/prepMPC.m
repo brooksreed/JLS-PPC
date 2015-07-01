@@ -1,5 +1,5 @@
 function [X_fwd,p_i] = prepMPC(t_sim,Xh_in,U_in_t,Dc_in,PI_C,...
-    A,Bu,E,M,N_STATES,N_VEH,N_CONTROLS,N_p,TAU_M,TAU_C)
+    A,Bu,E,M,N_STATES,N_VEH,N_CONTROLS,N_HORIZON,TAU_M,TAU_C)
 % propagate estimate fwd open-loop TAU_M + TAU_C steps using JLS system
 % [X_fwd,p_i] = prepMPC(t_sim,Xh_in,U_in_t,Dc_in,PI_C,...
 %    A,Bu,E,M,N_STATES,N_VEH,N_CONTROLS,N_p,TAU_M,TAU_C)
@@ -12,18 +12,19 @@ function [X_fwd,p_i] = prepMPC(t_sim,Xh_in,U_in_t,Dc_in,PI_C,...
 % p_i is vector of indices to tell schedMPC when to constrain controls to
 %   priors (due to scheduling)
 
-n_fwds = TAU_M+TAU_C;
-X_fwd = zeros(N_VEH*N_p*N_CONTROLS+N_STATES,n_fwds+1);
+N_FWDS = TAU_M+TAU_C;
+X_fwd = zeros(N_VEH*N_HORIZON*N_CONTROLS+N_STATES,N_FWDS+1);
 X_fwd(:,1) = Xh_in;
 
 % moving fwd
-for i = 1:n_fwds
+for i = 1:N_FWDS
     
     U_fwd = U_in_t(:,i);
     Dc_fwd = Dc_in(:,:,i);
     
-    AA_fwd = [A,Bu*E*M*(eye(N_p*N_CONTROLS*N_VEH)-Dc_fwd);...
-        zeros(N_VEH*N_p*N_CONTROLS,N_STATES),(eye(N_p*N_CONTROLS*N_VEH)-Dc_fwd)*M];
+    AA_fwd = [A,Bu*E*M*(eye(N_HORIZON*N_CONTROLS*N_VEH)-Dc_fwd);...
+        zeros(N_VEH*N_HORIZON*N_CONTROLS,N_STATES),...
+        (eye(N_HORIZON*N_CONTROLS*N_VEH)-Dc_fwd)*M];
     BU_fwd = [Bu*E*Dc_fwd;Dc_fwd];
     X_fwd(:,i+1) = AA_fwd*X_fwd(:,i)+BU_fwd*U_fwd;
     
