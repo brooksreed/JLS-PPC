@@ -4,9 +4,6 @@
 
 % pulls these settings outside of run script
 
-% BR, 6/18/2015
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SYSTEM INIT/SETUP
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -15,9 +12,9 @@ switch system
     case 'SISO_DOUBLE_INTEGRATOR'
         
         % controller settings
-        umax = 10;      
-        umin = -10;
-        nLevels = 15;   % quantization levels
+        U_MAX = 10;      
+        U_MIN = -10;
+        N_QUANT_LEVELS = 15;   % quantization levels
         Q = [10,0;0,1];
         Qf = 10*Q;
         R = 1;
@@ -27,7 +24,7 @@ switch system
         V = 1;
                 
         % cov... uncertain position but better-known velocity (closer to zero)
-        P1 = [25,0;0,9];     
+        P_1 = [25,0;0,9];     
         
         % Double Integrator
         A =[1,1;0,1];
@@ -35,14 +32,14 @@ switch system
         Bw = Bu;
         C = [1 0];      % position output
         Xmax = [];Xmin = [];
-        codebook = linspace(umin,umax,nLevels);
+        CODEBOOK = linspace(U_MIN,U_MAX,N_QUANT_LEVELS);
         
  case 'MIMO_DOUBLE_INTEGRATOR'
      
         % controller settings
-        umax = [10;10];
-        umin = [-10;-10];
-        nLevels = 15;   % quantization levels
+        U_MAX = [10;10];
+        U_MIN = [-10;-10];
+        N_QUANT_LEVELS = 15;   % quantization levels
         Q = [10,0;0,1];
         Qf = 10*Q;
         R = eye(2);
@@ -52,7 +49,7 @@ switch system
         V = eye(2);
         
         % cov... uncertain position but better-known velocity (closer to zero)
-        P1 = [25,0;0,9];  
+        P_1 = [25,0;0,9];  
         
         % Double Integrator
         A =[1,1;0,1];
@@ -60,14 +57,14 @@ switch system
         Bw = Bu;
         C = eye(2);    % full state output
         Xmax = [];Xmin = [];
-        codebook = linspace(min(umin),max(umax),nLevels);
+        CODEBOOK = linspace(min(U_MIN),max(U_MAX),N_QUANT_LEVELS);
         
     case 'SCALAR'
         
         % controller settings        
-        umax = 1;
-        umin = -1;
-        nLevels = 33;   % quantization levels
+        U_MAX = 1;
+        U_MIN = -1;
+        N_QUANT_LEVELS = 33;   % quantization levels
         Q = 10;
         Qf = 10*Q;
         R = 1;
@@ -77,7 +74,7 @@ switch system
         V = 1;
         
         % initial covariance
-        P1 = 9;
+        P_1 = 9;
         
         % Scalar integrator
         A =1;
@@ -85,52 +82,54 @@ switch system
         Bw = Bu;
         C = 1;      % position output
         Xmax = [];Xmin = [];
-        codebook = linspace(umin,umax,nLevels);
+        CODEBOOK = linspace(U_MIN,U_MAX,N_QUANT_LEVELS);
         
 end
 
 % check
-if( length(alpha_cBar)~=Nv )
+if( length(alpha_cBar)~=N_VEH )
     disp('WARNING: alpha_c, Nv mismatch')
 end
-if( length(alpha_mBar)~=Nv )
+if( length(alpha_mBar)~=N_VEH )
     disp('WARNING: alpha_m, Nv mismatch')
 end
-if( rem(size(C,1),Nv) )
+if( rem(size(C,1),N_VEH) )
     disp('WARNING: Nv not into C')
 end
-if( rem(size(Bu,2),Nv) )
+if( rem(size(Bu,2),N_VEH) )
     disp('WARNING: Nv not into Bu')
 end    
     
 % estimation init
-xHat1 = zeros(size(A,1),1);
+x_hat_1 = zeros(size(A,1),1);
 
 % random time-series realizations
-w = sqrt(W)*randn(size(Bw,2),simLength);
-v = sqrt(V)*randn(size(C,1),simLength);
+w = sqrt(W)*randn(size(Bw,2),SIM_LENGTH);
+v = sqrt(V)*randn(size(C,1),SIM_LENGTH);
 
 % packet loss sequences
-alpha_m = zeros(Nv,simLength);alpha_c = zeros(Nv,simLength);alpha_a = zeros(Nv,simLength);
+alpha_m = zeros(N_VEH,SIM_LENGTH);
+alpha_c = zeros(N_VEH,SIM_LENGTH);
+alpha_a = zeros(N_VEH,SIM_LENGTH);
 for k = 1:simLength
-    alpha_m(:,k) = (sign(rand(Nv,1) - (1-(alpha_mBar)))*0.5 + 0.5);
-    alpha_c(:,k) = (sign(rand(Nv,1) - (1-(alpha_cBar)))*0.5 + 0.5);
-    alpha_a(:,k) = (sign(rand(Nv,1) - (1-(alpha_aBar)))*0.5 + 0.5);
+    alpha_m(:,k) = (sign(rand(N_VEH,1) - (1-(ALPHAM_BAR)))*0.5 + 0.5);
+    alpha_c(:,k) = (sign(rand(N_VEH,1) - (1-(ALPHAC_BAR)))*0.5 + 0.5);
+    alpha_a(:,k) = (sign(rand(N_VEH,1) - (1-(ALPHAA_BAR)))*0.5 + 0.5);
 end
 
 %%%%%%%%%%%%%%%%%%
 
 if(strfind(sched,'piggyback'))
-    if(tau_a~=tau_m)
+    if(TAU_A~=TAU_M)
         disp('warning - resetting ta to tm')
-        ta = tm;
+        TAU_A = TAU_M;
     end
-    alpha_aBar = alpha_mBar;
+    ALPHAA_BAR = ALPHAM_BAR;
 elseif(strfind(sched,'NoACK'))
-    ta = 0;
+    TAU_A = 0;
 end
 
 % schedule time series
-[Pi_c,Pi_m,Pi_a,tac,Ts] = createSchedule(sched,Nv,simLength,tau_c);
-Np = NpMult*Ts;
+[PI_C,PI_M,PI_A,TAU_AC,T_S] = createSchedule(sched,N_VEH,SIM_LENGTH,TAU_C);
+N_p = Np_mult*T_S;
 

@@ -1,7 +1,7 @@
-function [results] = simJLSPPC(Ns,Np,Asys,Busys,Bwsys,Csys,...
-    QMPC,QfMPC,RMPC,WKF,VKF,tm,tc,ta,tac,acBar,Pi_c,Pi_m,Pi_a,Ts,...
-    umax,umin,codebook,Xmax,Xmin,xIC,P1,xHat1,w,v,a_c,a_m,a_a,...
-    covPriorAdj,nACKHistory,printDebug)
+function [results] = simJLSPPC(SIM_LEN,N_p,A_SYS,Bu_SYS,Bw_SYS,C_SYS,...
+    QMPC,QfMPC,RMPC,W_KF,V_KF,TAU_M,TAU_C,TAU_A,TAU_AC,ALPHAC_BAR,...
+    PI_C,PI_M,PI_A,T_S,U_MAX,U_MIN,CODEBOOK,XMAX,XMIN,X_IC,P_1,X_HAT1,...
+    w_t,v_t,alpha_c,alpha_m,alpha_a,cov_prior_adj,N_ACKHISTORY,print_debug)
 % runs simulation of MJLS/scheduled PPC
 % [results] = simJLSPPC(Ns,Np,Asys,Busys,Bwsys,Csys,...
 %     QMPC,QfMPC,RMPC,WKF,VKF,tm,tc,ta,tac,acBar,Pi_c,Pi_m,Pi_a,Ts,...
@@ -25,20 +25,20 @@ function [results] = simJLSPPC(Ns,Np,Asys,Busys,Bwsys,Csys,...
 % Add more automated tests/checks?
 
 
-% initialization stuff
-Nsysx = size(Asys,1);
-Nv = length(acBar);
-NU = size(Busys,2);    % all controls
-Nu = NU/Nv;         % per-vehicle
-Nw = size(Bwsys,2);
-NY = size(Csys,1);
-Ny = NY/Nv;
+% INITIALIZATION
+NX_SYS = size(A_SYS,1);
+N_VEH = length(ALPHAC_BAR);
+N_CONTROLS_ALL = size(Bu_SYS,2);    % all controls
+N_CONTROLS_VEH = N_CONTROLS_ALL/N_VEH;         % per-vehicle
+N_W = size(Bw_SYS,2);
+N_Y_ALL = size(C_SYS,1);
+N_Y_VEH = N_Y_ALL/N_VEH;
 
 % initialize tNoACK to zeros (no ACK for 'step 0')
-tNoACK = zeros(Nv,Ns);
+t_NoACK = zeros(N_VEH,SIM_LEN);
 
 % If initial controls unknown
-tNoACK(:,1:Ns) = repmat(1:Ns,[Nv,1]);
+t_NoACK(:,1:SIM_LEN) = repmat(1:SIM_LEN,[N_VEH,1]);
 
 % after first planned control RX, unknown
 % initialize based on 2nd pi_c + tau_c ?? (need tau_ac too?)
@@ -47,18 +47,18 @@ tNoACK(:,1:Ns) = repmat(1:Ns,[Nv,1]);
 % tNoACK(:,start:Ns) = 1:(Ns-start);
 
 % tNoACK *AS KNOWN EACH STEP*
-tNoACKSave = cell(Ns);
+t_NoACKSave = cell(SIM_LEN);
 
-if(covPriorAdj)
+if(cov_prior_adj)
     disp('COV PRIOR ADJUST ON')
     % compute Pstar terms for specific alpha_cBar
-    if(length(acBar)==1)
+    if(length(ALPHAC_BAR)==1)
         
         % load in the symbolic lookup table - faster
-        [PstarCoefficients,PstarFinalCoefficients] = ...
-            evaluatePstars(acBar);
-        cv.PstarCoefficients = PstarCoefficients;
-        cv.PstarFinalCoefficients = PstarFinalCoefficients;
+        [Pstar_coefficients,Pstar_final_coefficients] = ...
+            evaluatePstars(ALPHAC_BAR);
+        cov.Pstar_coefficients = Pstar_coefficients;
+        cov.Pstar_final_coefficients = Pstar_final_coefficients;
         
         % optionally, if nStars>11 desired, can compute numerically for a
         % specific alpha_cBar (may take a while)
@@ -74,77 +74,82 @@ if(covPriorAdj)
     
 end
 
+% turn control constraints into time series
+% (could be run with time-varying if desired)
+U_MAX_T = repmat(U_MAX,1,SIM_LEN+N_p);
+U_MIN_T = repmat(U_MIN,1,SIM_LEN+N_p);
 
-Umax = repmat(umax,1,Ns+Np);
-Umin = repmat(umin,1,Ns+Np);
-
-if(~ischar(codebook))
-    % Nearest-Neighbor quantizer: make partition
-    partition = ( codebook(2:end)+codebook(1:(end-1)) )/2;
+% Nearest-Neighbor quantizer: make partition
+if(~ischar(CODEBOOK))
+    partition = ( CODEBOOK(2:end)+CODEBOOK(1:(end-1)) )/2;
 end
 
-M = makeM(Nu,Np,Nv);
-etmp = [1,zeros(1,Np-1)];
-E = kron(eye(Nv),kron(etmp,eye(Nu)));
-BW = [Bwsys;zeros(Nu*Np*Nv,Nw)];
+% various sytem inits/preallocations
+M = makeM(N_CONTROLS_VEH,N_p,N_VEH);
+etmp = [1,zeros(1,N_p-1)];
+E = kron(eye(N_VEH),kron(etmp,eye(N_CONTROLS_VEH)));
+BW = [Bw_SYS;zeros(N_CONTROLS_VEH*N_p*N_VEH,N_W)];
 
-X = zeros(Nsysx+Nu*Np*Nv,Ns);  % includes x and b
-y = zeros(NY,Ns);           % true y (could be reconstructed Cx+v)
-yh = zeros(NY,Ns);          % y into estimator (could be reconstructed)
-Xh = NaN*zeros(Nsysx+Nu*Np*Nv,Ns); % includes xHat and bHat
-P = zeros(Nsysx,Nsysx,Ns);
-u = zeros(NU,Ns);
-U = zeros(Nu*Np*Nv,Ns);
+X = zeros(NX_SYS+N_CONTROLS_VEH*N_p*N_VEH,SIM_LEN);        % includes x and b
+y = zeros(N_Y_ALL,SIM_LEN);                             % true y 
+yh = zeros(N_Y_ALL,SIM_LEN);                            % y into estimator 
+Xh = NaN*zeros(NX_SYS+N_CONTROLS_VEH*N_p*N_VEH,SIM_LEN);   % includes xHat and bHat
+P = zeros(NX_SYS,NX_SYS,SIM_LEN);
+u = zeros(N_CONTROLS_ALL,SIM_LEN);
+U = zeros(N_CONTROLS_VEH*N_p*N_VEH,SIM_LEN);
 
-% initialize Dhat and Dyes
-D_cHat = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns+tc);   % D hat for estimator
-D_cNoLoss = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns+tc);   % used to track utilde for cov. prior
-alphaHat = repmat(acBar,[1 Ns]);
-for t = (tc+1):Ns
-    D_cHat(:,:,t) = makeD_c(Pi_c(:,t-tc),alphaHat(:,t-tc),Nu,Np);
-    D_cNoLoss(:,:,t) = makeD_c(Pi_c(:,t-tc),Pi_c(:,t-tc),Nu,Np);
+% initialize jump variable matrices
+Dc = zeros(N_CONTROLS_VEH*N_p*N_VEH,N_CONTROLS_VEH*N_p*N_VEH,SIM_LEN);    
+Dm = zeros(N_VEH*N_Y_VEH,N_VEH*N_Y_VEH,SIM_LEN);
+Da = zeros(N_VEH,N_VEH,SIM_LEN);
+
+% estimated alpha_c, Dc, no loss controls/buffers
+Dc_hat = zeros(N_CONTROLS_VEH*N_p*N_VEH,N_CONTROLS_VEH*N_p*N_VEH,SIM_LEN+TAU_C);   
+Dc_no_loss = zeros(N_CONTROLS_VEH*N_p*N_VEH,N_CONTROLS_VEH*N_p*N_VEH,SIM_LEN+TAU_C);   
+alphac_hat = repmat(ALPHAC_BAR,[1 SIM_LEN]);
+for t = (TAU_C+1):SIM_LEN
+    Dc_hat(:,:,t) = makeDc(PI_C(:,t-TAU_C),alphac_hat(:,t-TAU_C),N_CONTROLS_VEH,N_p);
+    Dc_no_loss(:,:,t) = makeDc(PI_C(:,t-TAU_C),PI_C(:,t-TAU_C),N_CONTROLS_VEH,N_p);
 end
+u_no_loss = zeros(N_CONTROLS_ALL,SIM_LEN);
+b_no_loss = zeros(N_CONTROLS_VEH*N_p*N_VEH,SIM_LEN);
 
-D_c = zeros(Nu*Np*Nv,Nu*Np*Nv,Ns);    % true D
-D_m = zeros(Nv*Ny,Nv*Ny,Ns);
-D_a = zeros(Nv,Nv,Ns);
+% includes xHatMPC and bHatMPC
+XhMPC = NaN*zeros(N_VEH*N_p*N_CONTROLS_VEH+NX_SYS,TAU_M+TAU_C+1,SIM_LEN);	
 
-uNoLoss = zeros(NU,Ns);
-bNoLoss = zeros(Nu*Np*Nv,Ns);
-
-XhMPC = NaN*zeros(Nv*Np*Nu+Nsysx,tm+tc+1,Ns);	% includes xHatMPC and bHatMPC
-Jcomp = NaN*zeros(1,Ns);
-XPlan = NaN*zeros(Nsysx,Np,Ns);
-MPCtime = NaN*zeros(Ns,1);
-looptime = zeros(Ns,1);
-MPCFail = zeros(Ns,1);
+% variables for saving MPC output/timing
+Jcomp = NaN*zeros(1,SIM_LEN);
+X_plan = NaN*zeros(NX_SYS,N_p,SIM_LEN);
+MPC_time = NaN*zeros(SIM_LEN,1);
+loop_time = zeros(SIM_LEN,1);
+MPC_fail = zeros(SIM_LEN,1);
 
 % initial state x_1 and z_1
-X(1:Nsysx,1) = xIC;
-y(:,1) = Csys*xIC+v(:,1);
+X(1:NX_SYS,1) = X_IC;
+y(:,1) = C_SYS*X_IC+v_t(:,1);
 
 % initial buffer - all zeros
-X(Nsysx+1:end,1) = zeros(Nu*Np*Nv,1);
+X(NX_SYS+1:end,1) = zeros(N_CONTROLS_VEH*N_p*N_VEH,1);
 
 % first step propagation - gives x_2
-X(1:Nsysx,2) =  Asys*xIC + w(:,1);
-y(:,2) = Csys*X(1:Nsysx,1) + v(:,2);
-u(:,1) = E*X(Nsysx+1:end,1);
+X(1:NX_SYS,2) =  A_SYS*X_IC + w_t(:,1);
+y(:,2) = C_SYS*X(1:NX_SYS,1) + v_t(:,2);
+u(:,1) = E*X(NX_SYS+1:end,1);
 
 % Loop starts at "estimator" at time t=tm+1, when first meas (t=1) is RX'd
-for t = (tm+1):(Ns-1)
+for t = (TAU_M+1):(SIM_LEN-1)
     looptic = tic;
     
     % determine which measurements are available at estimator at this step
     % at step t, meas. are sent at t-tm
-    D_m(:,:,t-tm) = makeD_m(Pi_m(:,t-tm),a_m(:,t-tm),Ny);
-    yh(:,t-tm) = D_m(:,:,t-tm)*y(:,t-tm);     % available tm steps after sent
+    Dm(:,:,t-TAU_M) = makeD_m(PI_M(:,t-TAU_M),alpha_m(:,t-TAU_M),N_Y_VEH);
+    yh(:,t-TAU_M) = Dm(:,:,t-TAU_M)*y(:,t-TAU_M);     
     
-    if(printDebug)
+    if(print_debug)
         fprintf('\n~~~STEP t=%d AT ESTIMATOR~~~\n',t)
-        for i = 1:Nv
-            if(Pi_m(i,t-tm)*a_m(i,t-tm)==1)
-                fprintf('\nt=%d, t-%d Meas %d RX success\n',t,i,tm)
+        for i = 1:N_VEH
+            if(PI_M(i,t-TAU_M)*alpha_m(i,t-TAU_M)==1)
+                fprintf('\nt=%d, t-%d Meas %d RX success\n',t,i,TAU_M)
             end
         end
     end
@@ -154,18 +159,18 @@ for t = (tm+1):(Ns-1)
     % uses tNoACK(t-ta-1) to determine how far back to update
     % updates tNoACK(t-ta) and history based on ACKs RX'd now
     % also increments a lookahead of tNoACK(t-ta+1 --> future)
-    [D_cHat,alphaHat,D_a,KFstart,tNoACK,~] = JLSJumpEstimator(D_cHat,...
-        Pi_c,D_a,a_c,alphaHat,Pi_a,Ts,a_a,t,tm,tc,ta,tac,...
-        Nu,Np,tNoACK,nACKHistory,printDebug);
-    tNoACKSave{t} = tNoACK;
+    [Dc_hat,alphac_hat,Da,KF_start,t_NoACK,~] = JLSJumpEstimator(Dc_hat,...
+        PI_C,Da,alpha_c,alphac_hat,PI_A,T_S,alpha_a,t,TAU_M,TAU_C,...
+        TAU_A,TAU_AC,N_CONTROLS_VEH,N_p,t_NoACK,N_ACKHISTORY,print_debug);
+    t_NoACKSave{t} = t_NoACK;
     
-    if(printDebug)
-        dispStart = t-8;
-        dispEnd = t+Ts+2;
-        if(dispStart<1);dispStart=1;end
-        if(dispEnd>Ns);dispEnd=Ns;end
-        fprintf('\n tNoACK(%d:%d):',dispStart,dispEnd)
-        disp(tNoACK(:,dispStart:dispEnd))
+    if(print_debug)
+        disp_start = t-8;
+        disp_end = t+T_S+2;
+        if(disp_start<1);disp_start=1;end
+        if(disp_end>SIM_LEN);disp_end=SIM_LEN;end
+        fprintf('\n tNoACK(%d:%d):',disp_start,disp_end)
+        disp(t_NoACK(:,disp_start:disp_end))
     end
     
     %%%%%%%%%%%%%%%
@@ -173,37 +178,38 @@ for t = (tm+1):(Ns-1)
     %%%%%%%%%%%%%%%
     
     % compute buffer and control action if all control packets through
-    if( (t-tm-1) >= 1)
-        if(t-tm-1>1)
-            bPrev = bNoLoss(:,t-tm-2);
+    if( (t-TAU_M-1) >= 1)
+        if(t-TAU_M-1>1)
+            b_prev = b_no_loss(:,t-TAU_M-2);
         else
-            bPrev = zeros(Nu*Np*Nv,1);
+            b_prev = zeros(N_CONTROLS_VEH*N_p*N_VEH,1);
         end
-        bNoLoss(:,t-tm-1) = M*(eye(Np*Nu*Nv)-D_cNoLoss(:,:,t-tm-1))*bPrev + ...
-            D_cNoLoss(:,:,t-tm-1)*U(:,t-tm-1);
-        uNoLoss(:,t-tm-1) = E*bNoLoss(:,t-tm-1);
+        b_no_loss(:,t-TAU_M-1) = M*(eye(N_p*N_CONTROLS_VEH*N_VEH)-Dc_no_loss...
+            (:,:,t-TAU_M-1))*b_prev + Dc_no_loss(:,:,t-TAU_M-1)*...
+            U(:,t-TAU_M-1);
+        u_no_loss(:,t-TAU_M-1) = E*b_no_loss(:,t-TAU_M-1);
     end
     
     % run KF from KFstart up until time of recent measurement
-    for tKF = KFstart:(t-tm)
+    for t_KF = KF_start:(t-TAU_M)
         
-        if(covPriorAdj)
+        if(cov_prior_adj)
                         
             % determine tNoACK vector for specific filter step
-            if(Nv==1)
-                if(tKF-1-tac>0)
-                    tNoACK_KF = tNoACK(1,tKF+tac-1);
+            if(N_VEH==1)
+                if(t_KF-1-TAU_AC>0)
+                    t_NoACK_KF = t_NoACK(1,t_KF+TAU_AC-1);
                 else
-                    tNoACK_KF = 1;
+                    t_NoACK_KF = 1;
                 end
             else
                 
                 % KEEP THIS?  OR MODIFY FOR JUST >0 OR NOT
                 %{
-                tNoACK_KF = zeros(1,Nv);
+                t_NoACK_KF = zeros(1,N_VEH);
                 for i = 1:Nv
-                    if(td-1-tac(i)>0)
-                        tNoACK_KF(i) = tNoACK(i,td+tac(i)-1);
+                    if(t_KF-1-TAU_AC(i)>0)
+                        t_NoACK_KF(i) = t_NoACK(i,t_KF+TAU_AC(i)-1);
                     end
                 end
                 %} 
@@ -211,81 +217,82 @@ for t = (tm+1):(Ns-1)
                 % (artificially constrain dU to zero for ACK'd channels?)
                 % (DO THIS HERE? OR INSIDE KF?)
                 
-                tNoACK_KF = 1;
+                t_NoACK_KF = 1;
                 
             end
             
             % prepare control options for use in cov. prior adj.
-            % Uoptions is indexed backwards
-            % Uoptions(:,1) is most recent, (:,tNoACK_KF) is furthest back
-            uOptions = zeros(NU,tNoACK_KF);
-            for k = 1:tNoACK_KF
-                if(tKF-k<1)
-                    bTMP = zeros(Nu*Np*Nv,1);
+            % u_options is indexed backwards
+            % u_options(:,1) is most recent, (:,tNoACK_KF) is furthest back
+            u_options = zeros(N_CONTROLS_ALL,t_NoACK_KF);
+            for k = 1:t_NoACK_KF
+                if(t_KF-k<1)
+                    bTMP = zeros(N_CONTROLS_VEH*N_p*N_VEH,1);
                 else
-                    bTMP = bNoLoss(:,tKF-k);
+                    bTMP = b_no_loss(:,t_KF-k);
                 end
-                uOptions(:,k) = E*M^k*bTMP;
+                u_options(:,k) = E*M^k*bTMP;
             end
             
         else
             
-            uOptions = [];
-            tNoACK_KF = [];
+            u_options = [];
+            t_NoACK_KF = [];
             
         end
         
-        if(tKF<=1)
-            AKF = eye(size(Asys));
-            DKFh = makeD_c(zeros(Nv,1),zeros(Nv,1),Nu,Np);
-            XhIn = [xHat1;zeros(Nu*Np*Nv,1)];
-            Pin = P1;
-            Uin = zeros(Nu*Np*Nv,1);
-            yIn = yh(:,1);
-            SIn = D_m(:,:,1);
+        if(t_KF<=1)
+            A_KF = eye(size(A_SYS));
+            Dc_KF_hat = makeD_c(zeros(N_VEH,1),zeros(N_VEH,1),N_CONTROLS_VEH,N_p);
+            Xh_in = [X_HAT1;zeros(N_CONTROLS_VEH*N_p*N_VEH,1)];
+            P_in = P_1;
+            U_in = zeros(N_CONTROLS_VEH*N_p*N_VEH,1);
+            y_in = yh(:,1);
+            Dm_in = Dm(:,:,1);
         else
-            AKF = Asys;
-            DKFh = D_cHat(:,:,tKF-1);
-            XhIn = Xh(:,tKF-1);
-            Pin = P(:,:,tKF-1);
-            Uin = U(:,tKF-1);
-            yIn = yh(:,tKF);
-            SIn = D_m(:,:,tKF);
+            A_KF = A_SYS;
+            Dc_KF_hat = Dc_hat(:,:,t_KF-1);
+            Xh_in = Xh(:,t_KF-1);
+            P_in = P(:,:,t_KF-1);
+            U_in = U(:,t_KF-1);
+            y_in = yh(:,t_KF);
+            Dm_in = Dm(:,:,t_KF);
         end
         
-        if(covPriorAdj)
-            cv.uOptions = uOptions;
-            cv.tNoACK = tNoACK_KF;
+        if(cov_prior_adj)
+            cov.u_options = u_options;
+            cov.t_NoACK = t_NoACK_KF;
         else
-            cv=0;
+            cov=0;
         end
         
-        printDebugKF=0;
-        if(printDebugKF~=0)
-            printDebugKF.t = t;printDebugKF.tKF = tKF;
+        print_debug_KF=0;
+        if(print_debug_KF~=0)
+            print_debug_KF.t = t;print_debug_KF.t_KF = t_KF;
         end
             
         % Xh(:,t-tm): xHat_{t-tm|t-tm},bHat_{t-tm-1}
-        [Xh(:,tKF),P(:,:,tKF)] = JLSKF(XhIn,Pin,yIn,Uin,DKFh,...
-            Nsysx,Nv,Nu,Np,SIn,AKF,Busys,E,M,Csys,WKF,VKF,acBar,...
-            cv,printDebugKF);
+        [Xh(:,t_KF),P(:,:,t_KF)] = JLSKF(Xh_in,P_in,y_in,U_in,Dc_KF_hat,...
+            NX_SYS,N_VEH,N_CONTROLS_VEH,N_p,Dm_in,A_KF,Bu_SYS,E,M,C_SYS,...
+            W_KF,V_KF,ALPHAC_BAR,cov,print_debug_KF);
         
-        if(printDebug)
-            if(covPriorAdj)
-                if(Nv==1)
+        if(print_debug)
+            if(cov_prior_adj)
+                if(N_VEH==1)
                     fprintf('\nt=%d, KF tKF=%d, tNoACK_KF(%d)=%d\n',...
-                        t,tKF,tKF+tac-1,tNoACK_KF)
+                        t,t_KF,t_KF+TAU_AC-1,t_NoACK_KF)
                 else
                     %   fprintf('\nt=%d, KF td=%d, tNoACK_KF(%d)=%d\n',...
                     %      t,td,td+tac(i)-1,tNoACK_KF(i))
                     % (add in once resolve ambiguity)
                 end
             end
-            if(size(Asys,1)==1)
+            if(size(A_SYS,1)==1)
                 % only print estimate for scalar sys
-                dispStart = tKF-5;
-                if(dispStart<1);dispStart=1;end
-                fprintf('Xh(:,%d:%d)=\n',dispStart,tKF);disp(Xh(:,dispStart:tKF)')
+                disp_start = t_KF - 5;
+                if(disp_start<1); disp_start = 1; end
+                fprintf('Xh(:,%d:%d)=\n',disp_start,t_KF);...
+                    disp(Xh(:,disp_start:t_KF)')
             end
         end
         
@@ -293,14 +300,15 @@ for t = (tm+1):(Ns-1)
     
     %%%%%%%
     % if control is to be computed/sent this step
-    if(max(Pi_c(:,t)))
+    if(max(PI_C(:,t)))
         
         %%%%%%%
         
         MPCtic = tic;
         
         % grab constraints (to accommodate time-varying)
-        [umax,umin,xmax,xmin] = paramsNow(Umax,Umin,Xmax,Xmin,t+1,Np);
+        [u_max,u_min,xmax,xmin] = paramsNow(U_MAX_T,U_MIN_T,XMAX,XMIN,...
+            t+1,N_p);
         
         % Forward propagation: XhMPC and k_p^i's
         % starts with Xh: xHat_{t-tm|t-tm}, bHat_{t-tm-1}
@@ -308,23 +316,24 @@ for t = (tm+1):(Ns-1)
         % first step: uses uHat_{t-tm} <-- Dh(:,:,t-tm)
         % *DEBUG NOTE* Goal of XhMPC(:,end,:) is to match true X(:,:)
         
-        Ufwd = U(:,(t-tm):(t+tc-1));
-        Dfwd = D_cHat(:,:,(t-tm):(t+tc-1));
-        [XhMPC(:,:,t+tc),p_i] = prepMPC(t,Xh(:,t-tm),Ufwd,Dfwd,Pi_c,...
-            Asys,Busys,E,M,Nsysx,Nv,Nu,Np,tm,tc);
+        U_fwd = U(:,(t-TAU_M):(t+TAU_C-1));
+        D_fwd = Dc_hat(:,:,(t-TAU_M):(t+TAU_C-1));
+        [XhMPC(:,:,t+TAU_C),p_i] = prepMPC(t,Xh(:,t-TAU_M),U_fwd,D_fwd,...
+            PI_C,A_SYS,Bu_SYS,E,M,NX_SYS,N_VEH,N_CONTROLS_VEH,N_p,TAU_M,TAU_C);
               
-        solveStatus = 0;
+        solve_status = 0;
         counter = 1;
-        TMPC = Np;
-        while(solveStatus==0)
+        T_MPC = N_p;
+        while(solve_status==0)
             
             % compute U_{t+tc}^i, forall i s.t. {Pi_c(i,t) = 1}
-            [Umpc,Jcomp(t),status,XP,~] = schedMPC(XhMPC(1:Nsysx,end,t+tc),...
-                XhMPC((Nsysx+1):end,end,t+tc),p_i,TMPC,Asys,Busys,M,E,QMPC,QfMPC,RMPC,...
-                umax,umin,xmin,xmax,[]);
+            [U_MPC,Jcomp(t),status,X_plan,~] = schedMPC(XhMPC(1:NX_SYS,...
+                end,t+TAU_C),XhMPC((NX_SYS+1):end,end,t+TAU_C),p_i,...
+                T_MPC,A_SYS,Bu_SYS,M,E,QMPC,QfMPC,RMPC,u_max,u_min,...
+                xmin,xmax,[]);
             
             if(strfind(status,'Solved'))
-                solveStatus=1;
+                solve_status=1;
                 fprintf('\nt=%d, MPC: %s\n',t,status)
                 
             elseif( strcmp(status,'Failed') )
@@ -333,130 +342,132 @@ for t = (tm+1):(Ns-1)
             elseif( strcmp(status,'Infeasible') )
                 disp('INFEASIBLE')
                 disp(counter)
-                disp(XhMPC(:,end,t+tc))
-                TMPC = TMPC+4;
-                [umax,umin,xmax,xmin] = paramsNow(Umax,Umin,Xmax,Xmin,...
-                    t+1,TMPC);
+                disp(XhMPC(:,end,t+TAU_C))
+                T_MPC = T_MPC+4;
+                [U_MAX,U_MIN,xmax,xmin] = paramsNow(U_MAX_T,U_MIN_T,...
+                    XMAX,XMIN,t+1,T_MPC);
             end
             
             counter = counter+1;
             if(counter>2)
                 disp('MAXCOUNTER')
-                Umpc = zeros(NU,Np);
-                MPCFail(t) = 1;
+                U_MPC = zeros(N_CONTROLS_ALL,N_p);
+                MPC_fail(t) = 1;
                 break
             end
             
         end
-        Umpc = Umpc(:,1:Np);    % truncate if TMPC>Np
-        XPlan(:,:,t) = XP(:,1:Np);
+        U_MPC = U_MPC(:,1:N_p);    % truncate if TMPC>Np
+        X_plan(:,:,t) = X_plan(:,1:N_p);
         
-        MPCtime(t) = toc(MPCtic);
+        MPC_time(t) = toc(MPCtic);
         
     else % (for saving - make clear not set)
         
-        Umpc = zeros(NU,Np);
+        U_MPC = zeros(N_CONTROLS_ALL,N_p);
         
     end
     
     % translate (NU x Np Umpc) into buffer shape Nu x Np x Nv
-    Uvec = reshape(Umpc',[Nu*Np*Nv,1]);
-    if(isempty(strfind(codebook,'none')))
-        [~,U(:,t+tc)] = quantiz(Uvec,partition,codebook);
-    elseif(strfind(codebook,'none'))
-        U(:,t+tc) = Uvec;
+    U_vec = reshape(U_MPC',[N_CONTROLS_VEH*N_p*N_VEH,1]);
+    if(isempty(strfind(CODEBOOK,'none')))
+        [~,U(:,t+TAU_C)] = quantiz(U_vec,partition,CODEBOOK);
+    elseif(strfind(CODEBOOK,'none'))
+        U(:,t+TAU_C) = U_vec;
     end
     
     % true system propagation
     % reshape into MJLS form (for step t), uses D_t(pi(t-tc),alpha_c(t-tc))
-    if(t<=tc)
-        D_c(:,:,t) = makeD_c(zeros(1,Nv),zeros(1,Nv),Nu,Np);
+    if(t<=TAU_C)
+        Dc(:,:,t) = makeD_c(zeros(1,N_VEH),zeros(1,N_VEH),N_CONTROLS_VEH,N_p);
     else
-        D_c(:,:,t) = makeD_c(Pi_c(:,t-tc),a_c(:,t-tc),Nu,Np);
+        Dc(:,:,t) = makeD_c(PI_C(:,t-TAU_C),alpha_c(:,t-TAU_C),...
+            N_CONTROLS_VEH,N_p);
     end
-    I = eye(size(D_c(:,:,1)));
-    AA = [Asys,Busys*E*M*(I-D_c(:,:,t));zeros(Nv*Np*Nu,Nsysx),M*(I-D_c(:,:,t))];
-    BU = [Busys*E*D_c(:,:,t);D_c(:,:,t)];
+    I = eye(size(Dc(:,:,1)));
+    AA = [A_SYS,Bu_SYS*E*M*(I-Dc(:,:,t));zeros(N_VEH*N_p*N_CONTROLS_VEH,...
+        NX_SYS),M*(I-Dc(:,:,t))];
+    BU = [Bu_SYS*E*Dc(:,:,t);Dc(:,:,t)];
     
     % propagate system x_{t+1} = f(D_t,x_t,U_t,w_t)
-    X(:,t+1) = AA*X(:,t) + BU*U(:,t) + BW*w(:,t);
+    X(:,t+1) = AA*X(:,t) + BU*U(:,t) + BW*w_t(:,t);
     
     % actual applied u_t for saving
-    u(:,t) = E*X(Nsysx+1:end,t+1);
+    u(:,t) = E*X(NX_SYS+1:end,t+1);
     
     % measurement z_{t+1}:
-    y(:,t+1) = Csys*X(1:Nsysx,t+1) + v(:,t+1);
+    y(:,t+1) = C_SYS*X(1:NX_SYS,t+1) + v_t(:,t+1);
     
-    looptime(t) = toc(looptic);
+    loop_time(t) = toc(looptic);
     
 end
 
-xF = X(1:Nsysx,end);
+xF = X(1:NX_SYS,end);
 % compute "actual" cost
 jj = u(:,1)'*RMPC*u(:,1);  % control at step 1
-for t = 2:Ns
+for t = 2:SIM_LEN
     % states at step 2 (affected by u(1)), through Ns
-    jj = jj + X(1:Nsysx,t)'*QMPC*X(1:Nsysx,t) + u(:,t)'*RMPC*u(:,t);
+    jj = jj + X(1:NX_SYS,t)'*QMPC*X(1:NX_SYS,t) + u(:,t)'*RMPC*u(:,t);
 end
 % final state (affected by final u)
 Jsim = jj + xF'*QMPC*xF;
 
 
-% add to results struct for saving:
+% populate results struct for output:
 
 results.X = X;
 results.u = u;
 results.U = U;
 
-results.uNoLoss = uNoLoss;
-results.bNoLoss = bNoLoss;
-results.tNoACK = tNoACK;
-results.tNoACKSave = tNoACKSave;
+results.u_no_loss = u_no_loss;
+results.b_no_loss = b_no_loss;
+results.t_NoACK = t_NoACK;
+results.t_NoACKSave = t_NoACKSave;
 
 results.Xh = Xh;
 results.P = P;
 
 results.XhMPC = XhMPC;
 results.Jcomp = Jcomp;
-results.XPlan = XPlan;
-results.MPCtime = MPCtime;
-results.MPCFail = MPCFail;
+results.X_plan = X_plan;
+results.MPC_time = MPC_time;
+results.MPC_fail = MPC_fail;
 
-results.looptime = looptime;
-results.Jsim = Jsim/Ns;
-results.rmsEstError = nanrms(X(1:Nsysx,:) - Xh(1:Nsysx,:),2);
-results.rmsStateError = nanrms(X(1:Nsysx,:),2);
+results.loop_time = loop_time;
+results.Jsim = Jsim/SIM_LEN;
+results.rms_est_error = nanrms(X(1:NX_SYS,:) - Xh(1:NX_SYS,:),2);
+results.rms_state_error = nanrms(X(1:NX_SYS,:),2);
 
 % run-specific parameters
-results.P1 = P1;
-results.v = v;
-results.w = w;
-results.xIC = xIC;
-results.xHat1 = xHat1;
-results.alpha_c = a_c;
-results.alpha_m = a_m;
-results.alpha_a = a_a;
-results.Pi_c = Pi_c;
-results.Pi_m = Pi_m;
-results.Pi_a = Pi_a;
+results.P1 = P_1;
+results.v_t = v_t;
+results.w_t = w_t;
+results.x_IC = X_IC;
+results.X_HAT1 = X_HAT1;
+results.alpha_c = alpha_c;
+results.alpha_m = alpha_m;
+results.alpha_a = alpha_a;
+results.PI_C = PI_C;
+results.PI_M = PI_M;
+results.PI_A = PI_A;
 
 % system
-sys.A = Asys;
-sys.Bu = Busys;
-sys.C = Csys;
-sys.umax = umax;
-sys.umin = umin;
+sys.A = A_SYS;
+sys.Bu = Bu_SYS;
+sys.C = C_SYS;
+sys.U_MAX = U_MAX;
+sys.U_MIN = U_MIN;
 sys.Q = QMPC;
 sys.Qf = QfMPC;
 sys.R = RMPC;
-sys.Np = Np;
-sys.W = WKF;
-sys.V = VKF;
-sys.alpha_cBar = acBar;
-sys.ta = ta;
-sys.tc = tc;
-sys.tm = tm;
-sys.nACKHistory = nACKHistory;
+sys.N_p = N_p;
+sys.W = W_KF;
+sys.V = V_KF;
+sys.alphac_bar = ALPHAC_BAR;
+sys.TAU_A = TAU_A;
+sys.TAU_C = TAU_C;
+sys.TAU_M = TAU_M;
+sys.n_ACKHistory = N_ACKHISTORY;
 
 results.sys = sys;
 

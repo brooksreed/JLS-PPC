@@ -1,12 +1,10 @@
-function M = makeM(Nu,Np,Nv)
+function M = makeM(N_CONTROLS,N_p,N_VEH)
 % M is (Nv*Np*Nu) square
 
-% v1.0 6/13/2015
-
-baseM = zeros(Np);
-baseM(1:Np-1,2:Np) = diag(ones(1,Np-1));
-baseM(Np,Np) = 0;   %m_f
-m = kron(baseM,eye(Nu));
-M = kron(eye(Nv),m);
+base_M = zeros(N_p);
+base_M(1:N_p-1,2:N_p) = diag(ones(1,N_p-1));
+base_M(N_p,N_p) = 0;   %m_f
+m = kron(base_M,eye(N_CONTROLS));
+M = kron(eye(N_VEH),m);
 
 end

@@ -1,39 +1,39 @@
-function [XFwd,p_i] = prepMPC(t_global,Xh_t,U_in_t,D_cIn_t,Pi_c_all,...
-    A,Bu,E,M,Nx,Nv,Nu,Np,tm,tc)
-% propagate estimate fwd open-loop tm+tc steps using MJLS system
-%
-% Xh is xHat_{t-tm|t-tm}, bHat_{(t-1)-tm}
-% Uin is U_{t-tm} to U_{t+tc-1}
-% D_cIn is Dh_{t-tm} to Dh_{t+tc-1}
+function [X_fwd,p_i] = prepMPC(t_sim,Xh_in,U_in_t,Dc_in,PI_C,...
+    A,Bu,E,M,N_STATES,N_VEH,N_CONTROLS,N_p,TAU_M,TAU_C)
+% propagate estimate fwd open-loop TAU_M + TAU_C steps using JLS system
+% [X_fwd,p_i] = prepMPC(t_sim,Xh_in,U_in_t,Dc_in,PI_C,...
+%    A,Bu,E,M,N_STATES,N_VEH,N_CONTROLS,N_p,TAU_M,TAU_C)
+%   
+% Xh_in is x_hat{t-TAU_M|t-TAU_M}, b_hat{(t-1)-TAU_M}
+% U_in is U{t-TAU_M:t+TAU_C-1}
+% Dc_in is Dc_hat{t-TAU_M:t+TAU_C-1}
 % 
-% XFwd is the forward-propagated estimate (tm+tc into future)
+% X_fwd is the forward-propagated estimate (TAU_M + TAU_C into future)
 % p_i is vector of indices to tell schedMPC when to constrain controls to
 %   priors (due to scheduling)
 
-% v1.0 6/13/2015
-
-nFwds = tm+tc;
-XFwd = zeros(Nv*Np*Nu+Nx,nFwds+1);
-XFwd(:,1) = Xh_t;
+n_fwds = TAU_M+TAU_C;
+X_fwd = zeros(N_VEH*N_p*N_CONTROLS+N_STATES,n_fwds+1);
+X_fwd(:,1) = Xh_in;
 
 % moving fwd
-for i = 1:nFwds
+for i = 1:n_fwds
     
-    UFwd = U_in_t(:,i);
-    D_cFwd = D_cIn_t(:,:,i);
+    U_fwd = U_in_t(:,i);
+    Dc_fwd = Dc_in(:,:,i);
     
-    AAFwd = [A,Bu*E*M*(eye(Np*Nu*Nv)-D_cFwd);...
-        zeros(Nv*Np*Nu,Nx),(eye(Np*Nu*Nv)-D_cFwd)*M];
-    BUFwd = [Bu*E*D_cFwd;D_cFwd];
-    XFwd(:,i+1) = AAFwd*XFwd(:,i)+BUFwd*UFwd;
+    AA_fwd = [A,Bu*E*M*(eye(N_p*N_CONTROLS*N_VEH)-Dc_fwd);...
+        zeros(N_VEH*N_p*N_CONTROLS,N_STATES),(eye(N_p*N_CONTROLS*N_VEH)-Dc_fwd)*M];
+    BU_fwd = [Bu*E*Dc_fwd;Dc_fwd];
+    X_fwd(:,i+1) = AA_fwd*X_fwd(:,i)+BU_fwd*U_fwd;
     
 end
 
 %%%%%%%%%%% compute k_p^i's
-p_i = zeros(Nv,1);
-for i = 1:Nv
-    iInds = find(Pi_c_all(i,(t_global):end)==1);
-    p_i(i) = iInds(1)-1;
+p_i = zeros(N_VEH,1);
+for i = 1:N_VEH
+    i_inds = find(PI_C(i,(t_sim):end)==1);
+    p_i(i) = i_inds(1)-1;
 end
 
 end
