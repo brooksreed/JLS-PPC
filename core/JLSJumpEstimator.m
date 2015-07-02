@@ -1,139 +1,140 @@
-function [D_cHat,alpha_cHat,D_a,KFstart,tNoACK,gotACK] = ...
-    JLSJumpEstimator(D_cHat,Pi_c,D_a,alpha_c,alpha_cHat,Pi_a,Ts,...
-    alpha_a,t,tm,tc,ta,tac,Nu,Np,tNoACK,nACKHistory,printDebug)
+function [Dc_hat_mod,alphac_hat_mod,Da_mod,KF_start_out,t_NoACK_mod,...
+    got_ACK] = JLSJumpEstimator(Dc_hat_mod,PI_C,Da_mod,alpha_c,...
+    alphac_hat_mod,PI_A,T_S,alpha_a,t_sim,TAU_M,TAU_C,TAU_A,TAU_AC,...
+    N_controls,N_HORIZON,t_NoACK_mod,N_ACKHISTORY,print_debug_JE)
 % Jump estimator and prep for (lossy,delayed) KF
-% [D_cHat,alpha_cHat,D_a,KFstart,tNoACK,gotACK] = ...
-%    JLSJumpEstimator(D_cHat,Pi_c,D_a,alpha_c,alpha_cHat,Pi_a,Ts,...
-%    alpha_a,t,tm,tc,ta,tac,Nu,Np,tNoACK,nACKHistory,printDebug)
-% Updates D_cHat, alpha_cHat based on delayed ACKs
-% Determines time that ACK'd buffer starts, outputs KFstart
-% Keeps track of tNoACK counter, also outputs gotACK flag
+% [Dc_hat_mod,alphac_hat_mod,Da_mod,KF_start_out,t_NoACK_mod,...
+%     got_ACK] = JLSJumpEstimator(Dc_hat_mod,PI_C,Da_mod,alpha_c,...
+%     alphac_hat_mod,PI_A,T_S,alpha_a,t_sim,TAU_M,TAU_C,TAU_A,TAU_AC,...
+%     N_controls,N_HORIZON,t_NoACK_mod,N_ACKHISTORY,print_debug_JE)
+% Updates Dc_hat, alphac_hat based on delayed ACKs
+% Determines time that ACK'd buffer starts, outputs KF_start
+% Keeps track of t_NoACK counter, also outputs gotACK flag
 %
 % Algorithm will back up as far as it can towards the most recent time of
 % an ACK, using ACK histories.  
 % It does not back up extra far (does not use all ACK history if not
 % needed).  
-% tNoACK(t-ta) resets to zero if ACK received at time t 
+% t_NoACK(t-TAU_A) resets to zero if ACK received at time t 
 
 
-% BR, 5/27/2015 (modified from single ACK version)
-% 5/28 - ACK histories
-% v1.0 6/13/2015
-% v1.1 6/16/2015
-
-nACKs = size(tNoACK,1);
+n_ACKs = size(t_NoACK_mod,1);
 
 % Algorithm uses previous step counter when figuring out how far to back up
-if(t-ta-1>0)
-    tNoACKAlg = tNoACK(:,t-ta-1);
+if(t_sim-TAU_A-1>0)
+    t_NoACK_JE = t_NoACK_mod(:,t_sim-TAU_A-1);
 else
-    tNoACKAlg = zeros(nACKs);
+    t_NoACK_JE = zeros(n_ACKs);
 end
 
 % limit "lookback" to the length of the ACK history sent
 % "-1" is so that no *extra* backups done if 1 ACK sent (nACKHistory=1)
-for i = 1:nACKs
-    if(tNoACKAlg(i) >= nACKHistory)
-        tNoACKAlg(i) = nACKHistory-1;
+for i = 1:n_ACKs
+    if(t_NoACK_JE(i) >= N_ACKHISTORY)
+        t_NoACK_JE(i) = N_ACKHISTORY-1;
     end
 end
 
 % determine ACKs available at this step
-if(t-ta<1)
-    aInds = [];
+if(t_sim-TAU_A<1)
+    a_inds = [];
 else
-    D_a(:,:,t-ta) = diag(Pi_a(:,t-ta).*alpha_a(:,t-ta));
-    aInds = find(diag(D_a(:,:,t-ta)));
+    Da_mod(:,:,t_sim-TAU_A) = diag(...
+        PI_A(:,t_sim-TAU_A).*alpha_a(:,t_sim-TAU_A));
+    a_inds = find(diag(Da_mod(:,:,t_sim-TAU_A)));
 end
 
 % use ACK information to update Dhat and alphaHat
 
 % check at start - don't reference negative times
 % slight hack, more precise would check individual channels... 
-checkStart = (t-ta-max(tac)>tc);
-if( ~isempty(aInds) && checkStart )
+check_start = (t_sim-TAU_A-max(TAU_AC)>TAU_C);
+if( ~isempty(a_inds) && check_start )
     
     % for each ACK channel
-    max_tACK = zeros(size(aInds));min_tACK = NaN*zeros(size(aInds));
-    tACK = cell(1,length(aInds));
-    for i = aInds
+    max_t_ACK = zeros(size(a_inds));min_t_ACK = NaN*zeros(size(a_inds));
+    t_ACK = cell(1,length(a_inds));
+    for i = a_inds
         
         % find time range for new ACKs
         % (furthest back in time ACK history will be useful)
-        tACK{i} = t-ta-tac(i)-tNoACKAlg(i):t-ta-tac(i);
+        t_ACK{i} = t_sim-TAU_A-TAU_AC(i) - ...
+            t_NoACK_JE(i):t_sim-TAU_A-TAU_AC(i);
         
         % constrain tNoACKAlg to be nACKHistory-1?
         % or increment left side +1
         
-        tACK{i} = tACK{i}(tACK{i}>tc);
-        min_tACK(i) = min(tACK{i});
-        max_tACK(i) = max(tACK{i});
+        t_ACK{i} = t_ACK{i}(t_ACK{i}>TAU_C);
+        min_t_ACK(i) = min(t_ACK{i});
+        max_t_ACK(i) = max(t_ACK{i});
     end
     
     % back-up each ACK channel to appropriate time
-    for i = aInds
+    for i = a_inds
         % run fwd incorporating new ACKs
-        for tprime = tACK{i}
+        for tprime = t_ACK{i}
             % update specific alpha_cHat's
-            alpha_cHat(i,tprime-tc) = alpha_c(i,tprime-tc);
+            alphac_hat_mod(i,tprime-TAU_C) = ...
+                alpha_c(i,tprime-TAU_C);
         end
     end
     
     % backup to earliest time across all channels
-    backupStart = min(min_tACK);
-    backupEnd = max(max_tACK);
+    backup_start = min(min_t_ACK);
+    backup_end = max(max_t_ACK);
     
     % update Dhat using alphahat
-    for tprime = backupStart:backupEnd
-        D_cHat(:,:,tprime) = makeD_c(Pi_c(:,tprime-tc),...
-            alpha_cHat(:,tprime-tc),Nu,Np);
+    for tprime = backup_start:backup_end
+        Dc_hat_mod(:,:,tprime) = makeDc(PI_C(:,tprime-TAU_C),...
+            alphac_hat_mod(:,tprime-TAU_C),N_controls,N_HORIZON);
     end
     
     % KFstart is the oldest (a posteriori) step of backup-rerun
     % KFstart uses the oldest updated Dhat(backupStart)
-    KFstart = min((t-tm),(backupStart+1));
-    if(printDebug)
-       fprintf('\nt=%d, JE t-tm=%d, backupStart+1=%d\n',t,t-tm,backupStart+1) 
+    KF_start_out = min((t_sim-TAU_M),(backup_start+1));
+    if(print_debug_JE)
+       fprintf('\nt=%d, JE t-tm=%d, backupStart+1=%d\n',...
+           t_sim,t_sim-TAU_M,backup_start+1) 
     end
     
 else
     
-    KFstart = t - tm;   % usual 1-step update
+    KF_start_out = t_sim - TAU_M;   % usual 1-step update
     
 end
 
 % update gotACK flag for each channel for KF to use
-gotACK = zeros(size(D_a,3));
-for i = 1:length(aInds)
-    gotACK(aInds(i)) = 1;
-    if(printDebug)
-        fprintf('\nt=%d, JE GOT ACK, channel %d \n',t,i)
+got_ACK = zeros(size(Da_mod,3));
+for i = 1:length(a_inds)
+    got_ACK(a_inds(i)) = 1;
+    if(print_debug_JE)
+        fprintf('\nt=%d, JE GOT ACK, channel %d \n',t_sim,i)
     end
 end
 
 % increment tNoACK (plus lookahead)
-if( (t-ta-1)>0 )
+if( (t_sim-TAU_A-1)>0 )
     
     nL = 100;
     
     % some checks for the end of the mission 
-    if(t-ta+nL>size(tNoACK,2))
-        maxadd = size(tNoACK,2);
+    if(t_sim-TAU_A+nL>size(t_NoACK_mod,2))
+        max_add = size(t_NoACK_mod,2);
     else
-        maxadd = t-ta+nL;
+        max_add = t_sim-TAU_A+nL;
     end
-    lookahead = 1:(maxadd-(t-ta));
+    lookahead = 1:(max_add-(t_sim-TAU_A));
     
     % update tNoACK based on new ACKs this step (t-ta)
-    for i = 1:nACKs
-        if(gotACK(i))
-            tNoACK(i,t-ta) = 0;
+    for i = 1:n_ACKs
+        if(got_ACK(i))
+            t_NoACK_mod(i,t_sim-TAU_A) = 0;
             
             % determine history able to be updated based on this ACK
             % () for clarity - (if nACKHistory=1: just t-ta)
-            tBackup = (t-ta)-(nACKHistory-1);   
-            if(tBackup<1)
-                tBackup = 1;
+            t_backup = (t_sim-TAU_A)-(N_ACKHISTORY-1);   
+            if(t_backup<1)
+                t_backup = 1;
             end
             
             % determine future that is known based on this ACK
@@ -143,31 +144,33 @@ if( (t-ta-1)>0 )
             %   tau_ac implicitly used for getting ACK
             %       fwd knowledge based entirely on Ts 
             %       Ts into future, new ACK is expected (counter starts up)
-            tFwd = (t-ta)+(Ts-1);
+            t_fwd = (t_sim-TAU_A)+(T_S-1);
             
             % zero counter based on ACKs received
-            tNoACK(i,tBackup:tFwd) = 0; 
+            t_NoACK_mod(i,t_backup:t_fwd) = 0; 
             
             % shift lookahead according to schedule
-            tNoACK(i,tFwd+1:maxadd) = lookahead(1:(maxadd-tFwd));
+            t_NoACK_mod(i,t_fwd+1:max_add) = lookahead(1:(max_add-t_fwd));
             
         end
     end
 end
 
-if(printDebug && (t-ta>1) )
-    for i = 1:nACKs
-        fprintf('\nt=%d, JE tNoACK(t-ta)=%d, tNoACK^%d(t)=%d\n',t,tNoACK(i,t-ta),i,tNoACK(i,t))
+if(print_debug_JE && (t_sim-TAU_A>1) )
+    for i = 1:n_ACKs
+        fprintf('\nt=%d, JE tNoACK(t-ta)=%d, tNoACK^%d(t)=%d\n',...
+            t_sim,t_NoACK_mod(i,t_sim-TAU_A),...
+            i,t_NoACK_mod(i,t_sim))
     end
     if(exist('backupStart','var'))
-        fprintf('      JE backupStart: t=%d\n',backupStart)
+        fprintf('      JE backupStart: t=%d\n',backup_start)
     end
 end
 
-if(printDebug)
-    for i = 1:nACKs
-        if(tNoACK(i) > nACKHistory)
-            fprintf('\nt=%d, JE WARNING: #dropped ACKs > ACK history, channel %d \n',t,i)
+if(print_debug_JE)
+    for i = 1:n_ACKs
+        if(t_NoACK_mod(i) > N_ACKHISTORY)
+            fprintf('\nt=%d, JE WARNING: #dropped ACKs > ACK history, channel %d \n',t_sim,i)
         end
     end
 end

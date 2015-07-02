@@ -1,109 +1,105 @@
-function [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
-    E,M,C,W,V,alpha_cBar,cv,pd)
-% [XHat,P] = JLSKF(XHat,P,yKF,USent,D_cHat,Nx,Nv,Nu,Np,D_m,A,Bu,...
-%     E,M,C,W,V,alpha_cBar,cv,pd)
-%
-% XHat is state estimate (system + buffer)
-% P is error cov.
-% yKF: meas into KF, D_m: meas success matrix
-% USent: control plan as sent (used if packet successful)
-% D_cHat: estimate of control jump variable
-% (std. system vars)
+function [XHat_out,P_out] = JLSKF(XHat_in,P_in,y_KF,U_sent,Dc_hat_all,...
+    N_STATES,N_AGENTS,N_CONTROLS,N_HORIZON,Dm_now,A,Bu,E,M,C,W,V,...
+    ALPHAC_BAR,cov,pd)
+% Kalman filter for missed measurements and controls
+% [XHat_out,P_out] = JLSKF(XHat_in,P_in,y_KF,U_sent,Dc_hat_all,...
+%     N_STATES,N_AGENTS,N_CONTROLS,N_HORIZON,Dm_now,A,Bu,E,M,C,W,V,...
+%     ALPHAC_BAR,cov,pd)
+% XHat is state estimate (system + buffer), all time steps
+% P is error cov., all time steps
+% y_KF: meas into KF
+% Dm_now: meas success matrix
+% U_sent: control plan as sent (used if packet successful)
+% Dc_hat: estimate of control jump variable
 % W, V: process, meas. noise covariances
-% alpha_cBar: control packet success probability
-% cv struct:  (if cv==0 or [], covPriorAdjust is not used)
-% else, cv must be a struct with the following fields:
-%   uOptions: NU x tNoACK vector of alternate control actions that might be
-%       applied depending on control packet success history
-% Uoptions is indexed backwards
-% Uoptions(:,1) is most recent, (:,tNoACK_KF) is furthest back
-%   tNoACK: time since ACK received (for covPriorAdj)
-%   PstarCoefficients: vector of coefficients for Pstar(1:nStars-1)
-%   PstarFinalCoefficients: vector of last term coefficients: Pstar(nStars)
-% pd struct: if(pd==0 or [], printDebug = 0)
+% ALPHAC_BAR: control packet success probability
+% cov=v struct:  (if cov==0 or [], cov_prior_adjust is not used)
+% else, cov must be a struct with the following fields:
+%   u_options: N_CONTROLS x t_NoACK vector of alternate control actions 
+%       u_options is indexed backwards
+%       u_options(:,1) is most recent, (:,t_NoACK_KF) is furthest back
+%   t_NoACK: time since ACK received (for cov_prior_adj)
+%   Pstar_coefficients: vector of coefficients for Pstar(1:n_stars-1)
+%   Pstar_final_coefficients: vector of last term coefficients: Pstar(n_stars)
+% pd struct: if(pd==0 or [], print_debug_KF = 0)
 %   t: true time at estimator when fcn is called (mostly for debugging)
-%   tKF: physical time step KF is updating -- xHat(tKF|tKF) posterior
+%   t_KF: physical time step KF is updating -- x_hat(t_KF|t_KF) posterior
 
-% v1.0 6/13/2015
-% v1.1 6/16/2015
-
-% 6/26/2015: modified for many P* terms
-
-if(isstruct(cv))
+if(isstruct(cov))
     
-    covPriorAdj = 1;
-    uOptions = cv.uOptions;
-    tNoACK = cv.tNoACK;
+    cov_prior_adj = 1;
+    u_options = cov.u_options;
+    t_NoACK = cov.t_NoACK;
     if(size(Bu,2)==1)
-        PstarCoefficients = cv.PstarCoefficients;
-        PstarFinalCoefficients = cv.PstarFinalCoefficients;
-        nStars = length(PstarCoefficients);
+        Pstar_coefficients = cov.Pstar_coefficients;
+        Pstar_final_coefficients = cov.Pstar_final_coefficients;
+        n_stars = length(Pstar_coefficients);
     end
     
-elseif(isempty(cv) || cv==0)
-    covPriorAdj = 0;
+elseif(isempty(cov) || cov==0)
+    cov_prior_adj = 0;
 end
 
-if(isstruct(pd))
-    t = pd.t; tKF = pd.tKF;
-    printDebug=1;
+if( isstruct(pd) )
+    t = pd.t; t_KF = pd.t_KF;
+    print_debug_kf = 1;
 elseif(isempty(pd) || pd==0)
-    printDebug = 0;
+    print_debug_kf = 0;
 end
 
 % covariance prior (standard)
-Ppre0 = A*P*A' + W ; %P_{t+1|t}
+P_pre_0 = A*P_in*A' + W ; %P_{t+1|t}
 
-if( covPriorAdj && (max(tNoACK)>0) )
+if( cov_prior_adj && (max(t_NoACK)>0) )
     
     % SENT control command for step t
-    ut = E*USent;
+    u_t = E*U_sent;
     
-    dU = zeros(size(ut,1),max(tNoACK));
-    for i = 1:max(tNoACK)
-        dU(:,i) = (ut - uOptions(:,i));
+    dU = zeros(size(u_t,1),max(t_NoACK));
+    for i = 1:max(t_NoACK)
+        dU(:,i) = (u_t - u_options(:,i));
     end
     
     % Single input systems
     if(size(Bu,2)==1)
         
         % tNoACK is a scalar
-        if(length(tNoACK)>1)
+        if(length(t_NoACK)>1)
             disp('ERROR: tNoACK is vector, expected scalar')
         end
         
-        if(tNoACK>nStars)
-            if(printDebug)
+        if(t_NoACK>n_stars)
+            if(print_debug_kf)
                 fprintf('\nt=%d, KF tKF=%d ERROR: tNoACK too large, using Pstar%d\n',...
-                    t,tKF,nStars)
+                    t,t_KF,n_stars)
             end
-            tNoACK=nStars;
+            t_NoACK=n_stars;
         end
         
         % NOTE -- uHistory are from prev. COMPUTED buffers
         % they are not necessarily shifts of the buffer estimate in Xh
-        Pstar = zeros(size(P,1),size(P,2),tNoACK);
+        Pstar = zeros(size(P_in,1),size(P_in,2),t_NoACK);
         
         % Construct covariance addition terms: P*
-        if(tNoACK>1)
+        if(t_NoACK>1)
             % coefficients for all except last term:
-            for j = 1:(tNoACK-1)
-                Pstar(:,:,j) = PstarCoefficients(j)*...
+            for j = 1:(t_NoACK-1)
+                Pstar(:,:,j) = Pstar_coefficients(j)*...
                     Bu*dU(:,j)*dU(:,j)'*Bu';
             end
         end
         % separate coefficient form for the last term:
-        Pstar(:,:,tNoACK) = PstarFinalCoefficients(tNoACK)*...
-            Bu*dU(:,tNoACK)*dU(:,tNoACK)'*Bu';
+        Pstar(:,:,t_NoACK) = Pstar_final_coefficients(t_NoACK)*...
+            Bu*dU(:,t_NoACK)*dU(:,t_NoACK)'*Bu';
         
-        if(printDebug)
+        if(print_debug_kf)
             % print out sum of Pstar terms
             if(size(Pstar,1)==1)
                 fprintf('\nt=%d, KF tKF=%d, tNoACK_KF = %d, P* = %f \n',...
-                    t, tKF,tNoACK,squeeze(sum(Pstar,3)))
+                    t, t_KF,t_NoACK,squeeze(sum(Pstar,3)))
             else
                 fprintf('\nt=%d, KF tKF=%d, tNoACK_KF = %d, P* = \n',...
-                    t, tKF,tNoACK)
+                    t, t_KF,t_NoACK)
                 disp(squeeze(sum(Pstar,3)))
             end
             
@@ -113,52 +109,56 @@ if( covPriorAdj && (max(tNoACK)>0) )
         end
         
         % add on the new terms
-        Ppre = Ppre0+sum(Pstar,3);
+        P_pre = P_pre_0 + sum(Pstar,3);
         
     else
         
         % single-step: Pstar
         
         % (zero out dU manually for ACK'd channels - need to test)
-        for i = 1:length(tNoACK)
-            if(tNoACK(i)==0)
-                dU(i,1)=0;
+        for i = 1:length(t_NoACK)
+            if(t_NoACK(i) == 0)
+                dU(i,1) = 0;
             end
         end
         
         % off diagonal elements
-        EAZA = diag(alpha_cBar)*dU(:,1)*dU(:,1)'*diag(alpha_cBar);
+        E_AZA = diag(ALPHAC_BAR)*dU(:,1)*dU(:,1)'*diag(ALPHAC_BAR);
         
         % replace diagonal elements
-        dum = diag(alpha_cBar)*dU(:,1)*dU(:,1)';
-        for i = 1:Nu; EAZA(i,i) = dum(i,i) ; end;
+        dum = diag(ALPHAC_BAR)*dU(:,1)*dU(:,1)';
+        for i = 1:N_CONTROLS; E_AZA(i,i) = dum(i,i) ; end;
         
-        Pstar = Bu*(EAZA - diag(alpha_cBar)*dU(:,1)*dU(:,1)'*...
-            diag(alpha_cBar))*Bu';
+        Pstar = Bu*(E_AZA - diag(ALPHAC_BAR)*dU(:,1)*dU(:,1)'*...
+            diag(ALPHAC_BAR))*Bu';
         
-        Ppre = Ppre0+Pstar;
+        P_pre = P_pre_0 + Pstar;
         
-        
-        fprintf('\nt=%d, KF tKF=%d, MIMO P*: \n',t,tKF)
-        disp(Pstar)
+        if(print_debug_kf)
+            fprintf('\nt=%d, KF tKF=%d, MIMO P*: \n',t,t_KF)
+            disp(Pstar)
+        end
         
         
     end
 else
     
-    Ppre = Ppre0;
+    P_pre = P_pre_0;
     
 end
 
 % Kalman gain = fcn of Ppre
-L = ((Ppre*C')/(C*Ppre*C'+V))*D_m;   % L_{t}
-P = Ppre - L*(C*Ppre);
+L = ((P_pre*C')/(C*P_pre*C'+V))*Dm_now;   % L_{t}
+P_out = P_pre - L*(C*P_pre);
 
 % propagate system
 I = eye(size(A));
-AAHat = [(I-L*C)*A,(I-L*C)*Bu*E*M*(eye(Np*Nu*Nv)-D_cHat);...
-    zeros(Nv*Np*Nu,Nx),M*(eye(Np*Nu*Nv)-D_cHat)];
-BUHat = [(I-L*C)*Bu*E*D_cHat;D_cHat];
-XHat = AAHat*XHat + BUHat*USent+[L;zeros(Np*Nu*Nv,size(yKF,1))]*yKF;
+AAHat = [(I-L*C)*A,...
+    (I-L*C)*Bu*E*M*(eye(N_HORIZON*N_CONTROLS*N_AGENTS)-Dc_hat_all);...
+    zeros(N_AGENTS*N_HORIZON*N_CONTROLS,N_STATES),...
+    M*(eye(N_HORIZON*N_CONTROLS*N_AGENTS)-Dc_hat_all)];
+BUHat = [(I-L*C)*Bu*E*Dc_hat_all;Dc_hat_all];
+XHat_out = AAHat*XHat_in + BUHat*U_sent + ...
+    [L;zeros(N_HORIZON*N_CONTROLS*N_AGENTS,size(y_KF,1))]*y_KF;
 
 end

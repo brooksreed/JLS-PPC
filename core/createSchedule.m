@@ -1,7 +1,11 @@
-function [Pi_c,Pi_m,Pi_a,tac,Ts] = createSchedule(sched,Nv,Ns,tc)
-% creates Pi_c, Pi_m, Pi_a schedule
-% [Pi_c,Pi_m,Pi_a,ta_c,Ts] = createSchedule(sched,Nv,Ns,tc)
-% Nv: #vehicles, Ns: sim length, tc: control delay
+function [PI_C,PI_M,PI_A,TAU_AC,T_S] = createSchedule(sched,N_VEH,...
+    SIM_LEN,TAU_C)
+% creates schedule time series variables and TAU_AC and T_S parameters
+% PI_C,PI_M,PI_A,TAU_AC,T_S] = createSchedule(sched,N_VEH,SIM_LEN,TAU_C)
+%
+% TAU_AC = N_VEH x 1 vector of time between planned control RX and ACK TX
+% T_S: schedule length (one period)
+%
 % sched options:
 % 'RRmeas' -- round-robin for meas, with 1 unused slot (match Ts of MX)
 % 'MX_noACK', 'IL_noACK' 
@@ -10,71 +14,67 @@ function [Pi_c,Pi_m,Pi_a,tac,Ts] = createSchedule(sched,Nv,Ns,tc)
 %
 % 'SISO_' options for _piggyback or _noACK:
 % 'SISOALL' - [1],[1] (std. discrete-time)
-% 'SISO2' - [1 0], [0 1] for Pi_c, Pi_m
-% 'SISO4' - [1 0 0 0], [0 0 1 0] for Pi_c, Pi_m
+% 'SISO2' - [1 0], [0 1] for PI_C, PI_M
+% 'SISO4' - [1 0 0 0], [0 0 1 0] for PI_C, PI_M
 %
-% 'tac' = Nv x 1 vector of time between planned control RX and ACK TX
-
-% BR, 4/23/2014
-% v1.0 6/13/2015
 
 % TO DO: 
 % lots of hardcoding...  make more modular?
 
 if(strfind(sched,'SISOALL'))
-    Ts = 1;
-    Pi_cBase = 1;
-    Pi_mBase = 1;
+    T_S = 1;
+    Pi_c_base = 1;
+    Pi_m_base = 1;
     if(strfind(sched,'piggyback'))
-        Pi_aBase = Pi_mBase;
+        Pi_a_base = Pi_m_base;
     elseif(strfind(sched,'noACK'))
-        Pi_aBase = 0;
+        Pi_a_base = 0;
     end
 end
 
 if(strfind(sched,'SISO2'))
-    Ts = 2;
-    Pi_cBase = [1 0];
-    Pi_mBase = [0 1];
+    T_S = 2;
+    Pi_c_base = [1 0];
+    Pi_m_base = [0 1];
     if(strfind(sched,'piggyback'))
-        Pi_aBase = Pi_mBase;
+        Pi_a_base = Pi_m_base;
     elseif(strfind(sched,'noACK'))
-        Pi_aBase = [0 0];
+        Pi_a_base = [0 0];
     end
 end
 
 if(strfind(sched,'SISO2ALLCONTROL'))
-    Ts = 2;
-    Pi_cBase = [1 1];
-    Pi_mBase = [0 1];
+    T_S = 2;
+    Pi_c_base = [1 1];
+    Pi_m_base = [0 1];
     if(strfind(sched,'piggyback'))
-        Pi_aBase = Pi_mBase;
+        Pi_a_base = Pi_m_base;
     elseif(strfind(sched,'noACK'))
-        Pi_aBase = [0 0];
+        Pi_a_base = [0 0];
     end
 end
 
 if(strfind(sched,'SISO4'))
-    Ts = 4;
-    Pi_cBase = [1 0 0 0];
-    Pi_mBase = [0 0 1 0];
+    T_S = 4;
+    Pi_c_base = [1 0 0 0];
+    Pi_m_base = [0 0 1 0];
     if(strfind(sched,'piggyback'))
-        Pi_aBase = Pi_mBase;
+        Pi_a_base = Pi_m_base;
     elseif(strfind(sched,'noACK'))
-        Pi_aBase = [0 0 0 0];
+        Pi_a_base = [0 0 0 0];
     end
 end
 
 
 if(strfind(sched,'RRmeas'))
     sched = 'RRmeas_noACK';
-    Ts = Nv+1;  % set RR sched equal to MX sched length
-    Pi_cBase = ones(Nv,Ts);
-    Pi_mBase = zeros(Nv,Ts);
-    for i = 1:Nv
-        Pi_mBase(i,i) = 1;
+    T_S = N_VEH+1;  % set RR sched equal to MX sched length
+    Pi_c_base = ones(N_VEH,T_S);
+    Pi_m_base = zeros(N_VEH,T_S);
+    for i = 1:N_VEH
+        Pi_m_base(i,i) = 1;
     end
-    Pi_aBase = zeros(Nv,Ts);
+    Pi_a_base = zeros(N_VEH,T_S);
 end
 
 if( ~isempty((strfind(sched,'noACK'))) ||...
@@ -82,75 +82,75 @@ if( ~isempty((strfind(sched,'noACK'))) ||...
 
     if(strfind(sched,'block'))
 
-        Ts = Nv + Nv;
-        Pi_cBase = zeros(Nv,Ts);
-        for i = 1:Nv
-            Pi_cBase(i,Nv+i) = 1;
+        T_S = N_VEH + N_VEH;
+        Pi_c_base = zeros(N_VEH,T_S);
+        for i = 1:N_VEH
+            Pi_c_base(i,N_VEH+i) = 1;
         end
-        Pi_mBase = zeros(Nv,Ts);
-        for i = 1:Nv
-            Pi_mBase(i,i) = 1;
+        Pi_m_base = zeros(N_VEH,T_S);
+        for i = 1:N_VEH
+            Pi_m_base(i,i) = 1;
         end
         
     elseif(strfind(sched,'IL'))
 
-        Ts = Nv + Nv;
-        Pi_cBase = zeros(Nv,Ts);
-        for i = 1:Nv
-            Pi_cBase(i,(2*i)) = 1;
+        T_S = N_VEH + N_VEH;
+        Pi_c_base = zeros(N_VEH,T_S);
+        for i = 1:N_VEH
+            Pi_c_base(i,(2*i)) = 1;
         end
-        Pi_mBase = zeros(Nv,Ts);
-        for i = 1:Nv
-            Pi_mBase(i,(2*i-1)) = 1;
+        Pi_m_base = zeros(N_VEH,T_S);
+        for i = 1:N_VEH
+            Pi_m_base(i,(2*i-1)) = 1;
         end
         
     elseif(strfind(sched,'MX'))
-        Ts = Nv + 1;
-        Pi_cBase = zeros(Nv,Ts);
-        Pi_cBase(:,Ts) = ones(Nv,1);
-        Pi_mBase = zeros(Nv,Ts);
-        for i = 1:Nv
-            Pi_mBase(i,i) = 1;
+        T_S = N_VEH + 1;
+        Pi_c_base = zeros(N_VEH,T_S);
+        Pi_c_base(:,T_S) = ones(N_VEH,1);
+        Pi_m_base = zeros(N_VEH,T_S);
+        for i = 1:N_VEH
+            Pi_m_base(i,i) = 1;
         end
         
     end
     
     % set Pi_a
     if(strfind(sched,'piggyback'))
-        Pi_aBase = Pi_mBase;
+        Pi_a_base = Pi_m_base;
     else
-        Pi_aBase = zeros(size(Pi_mBase));
+        Pi_a_base = zeros(size(Pi_m_base));
     end
 
 elseif(strfind(sched,'ACK1'))   % dedicated ACK slot right after u
     
     if(strfind(sched,'IL'))
-        Ts = Nv + Nv + Nv;
-        Pi_aBase = zeros(Nv,Ts);
-        for i = 1:Nv
-            Pi_aBase(i,(3*i)) = 1;
+        T_S = N_VEH + N_VEH + N_VEH;
+        Pi_a_base = zeros(N_VEH,T_S);
+        for i = 1:N_VEH
+            Pi_a_base(i,(3*i)) = 1;
         end        
-        Pi_cBase = zeros(Nv,Ts);
-        for i = 1:Nv
-            Pi_cBase(i,(3*i-1)) = 1;
+        Pi_c_base = zeros(N_VEH,T_S);
+        for i = 1:N_VEH
+            Pi_c_base(i,(3*i-1)) = 1;
         end
-        Pi_mBase = zeros(Nv,Ts);
-        for i = 1:Nv
-            Pi_mBase(i,(3*i-2)) = 1;
+        Pi_m_base = zeros(N_VEH,T_S);
+        for i = 1:N_VEH
+            Pi_m_base(i,(3*i-2)) = 1;
         end        
         
     elseif(strfind(sched,'MX'))
-        Ts = Nv + Nv + 1;
+        T_S = N_VEH + N_VEH + 1;
         
-        Pi_cBase = zeros(Nv,Ts);
-        Pi_cBase(:,Nv+1) = ones(Nv,1);
-        Pi_mBase = zeros(Nv,Ts);
-        for i = 1:Nv
-            Pi_mBase(i,i) = 1;
+        Pi_c_base = zeros(N_VEH,T_S);
+        Pi_c_base(:,N_VEH+1) = ones(N_VEH,1);
+        Pi_m_base = zeros(N_VEH,T_S);
+        for i = 1:N_VEH
+            Pi_m_base(i,i) = 1;
         end        
-        Pi_aBase = zeros(Nv,Ts);
-        for i = 1:Nv
-            Pi_aBase(i,Nv+1+i) = 1;
+        Pi_a_base = zeros(N_VEH,T_S);
+        for i = 1:N_VEH
+            Pi_a_base(i,N_VEH+1+i) = 1;
         end
         
     end
@@ -160,28 +160,28 @@ end
 
 
 % compute tap
-tac = zeros(Nv,1);
+TAU_AC = zeros(N_VEH,1);
 if(isempty(strfind(sched,'noACK')))
-    for i = 1:Nv
-        Pi_cPos = find(Pi_cBase(i,:))+tc;   % planned control RX
-        Pi_aPos = find(Pi_aBase(i,:));
-        if(Pi_cPos>Pi_aPos)
-            Pi_aPos = Pi_aPos + Ts;
+    for i = 1:N_VEH
+        Pi_c_positive = find(Pi_c_base(i,:)) + TAU_C;   
+        Pi_a_positive = find(Pi_a_base(i,:));
+        if(Pi_c_positive>Pi_a_positive)
+            Pi_a_positive = Pi_a_positive + T_S;
         end
         try
-            tac(i) = Pi_aPos - Pi_cPos;
+            TAU_AC(i) = Pi_a_positive - Pi_c_positive;
         catch
             % (SISO2ALLCONTROL -- fix eventually)
-            tac(i) = 0;
+            TAU_AC(i) = 0;
         end
     end
 end
 
-nPers = ceil(Ns/Ts);
-Pi_c = repmat(Pi_cBase,1,nPers);
-Pi_m = repmat(Pi_mBase,1,nPers);
-Pi_a = repmat(Pi_aBase,1,nPers);
-Pi_c = Pi_c(:,1:Ns);
-Pi_m = Pi_m(:,1:Ns);
-Pi_a = Pi_a(:,1:Ns);
+n_periods = ceil(SIM_LEN/T_S);
+PI_C = repmat(Pi_c_base,1,n_periods);
+PI_M = repmat(Pi_m_base,1,n_periods);
+PI_A = repmat(Pi_a_base,1,n_periods);
+PI_C = PI_C(:,1:SIM_LEN);
+PI_M = PI_M(:,1:SIM_LEN);
+PI_A = PI_A(:,1:SIM_LEN);
 

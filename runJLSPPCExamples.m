@@ -14,17 +14,6 @@
 % v1.1 6/16/2015
 
 
-% TO DO:
-
-% clean up/separate inputs vs. other?
-% one toggle for 'debugging mode'?
-% more detailed plots for SISO
-
-% MIMO cleaner system setup, make Nc and Nm vs. Nv?
-% MIMO basic plots
-% MIMO Pstar - ambiguity with partial ACKs
-
-% automated saving/logging?
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -32,16 +21,17 @@ clear variables
 close all
 clc
 
-printDebug = 1;
+print_debug = 1;
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SYSTEM DEFINITION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % SIM LENGTH
-Ns = 40; % sim length
+SIM_LENGTH = 20; % sim length
 
 % MPC HORIZON:
-NpMult = 4; % the MPC horizon Np = Ts*NpMult
+N_HORIZON_MULT = 4; % the MPC horizon Np = Ts*NpMult
 
 %%%%%%%%%%%
 % SYSTEM (set up in setupSystemJPLPPC)
@@ -83,16 +73,16 @@ elseif( ~isempty(strfind(system,'MIMO')))
 end
 
 % DELAYS
-tc = 1; % control delay
-tm = 1; % meas delay (Also ACK delay with piggyback unless overwritten)
-ta = 1; % ACK delay
+TAU_C = 1; % control delay
+TAU_M = 1; % meas delay (Also ACK delay with piggyback unless overwritten)
+TAU_A = 1; % ACK delay
 
 % ACK SETTINGS
 % # ACK Histories sent (makes most sense to be multiple of schedule length)
 % For 'SINGLE ACK': sys nACKHistory = Ts (schedule length)
-nACKHistory = 5;
+N_ACKHISTORY = 2;
 % adjustment to covariance priors due to no ACKs/control losses:
-covPriorAdj = 1;
+cov_prior_adj = 0;
 
 %%%%%%%%%%%%%
 % PACKET SUCCESS PROBABILITIES
@@ -100,67 +90,39 @@ covPriorAdj = 1;
 % Nv is number of control AND meas channels (asymmetric # not implemented)
 if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
     
-    Nv = 1;
-    alpha_cBar = .75; % controls
-    alpha_mBar = .7;  % measurements
-    alpha_aBar = .7; % ACKs (if piggyback used, betaBar overrides gammaBar)
+    N_VEH = 1;
+    ALPHAC_BAR = .75; % controls
+    ALPHAM_BAR = .75;  % measurements
+    ALPHAA_BAR = .75; % ACKs (if piggyback used, betaBar overrides gammaBar)
     
 else
     
-    Nv = 2;
+    N_VEH = 2;
     
-    %alpha_cBar = [.75;.75];
-    %alpha_mBar = [.75;.75];
-    %alpha_aBar = [.75;.75];
+    %ALPHAC_BAR = [.75;.75];
+    %ALPHAM_BAR = [.75;.75];
+    %ALPHAA_BAR = [.75;.75];
     
-    alpha_cBar = 1*ones(Nv,1);
-    alpha_mBar = 1*ones(Nv,1);
-    alpha_aBar = 1*ones(Nv,1);
+    ALPHAC_BAR = .75*ones(N_VEH,1);
+    ALPHAM_BAR = .75*ones(N_VEH,1);
+    ALPHAA_BAR = .75*ones(N_VEH,1);
     
 end
 
 %% system setup
+
+% (system params are in setupSystemJLSPPC script)
 setupSystemJLSPPC
 
 % initial conditions
-xIC = 5*randn(size(A,1),1);
+x_IC = 5*randn(size(A,1),1);
 if(size(A,1)==2)
     % position only, no initial velocity (so like step resp from rest)
-    xIC(2)=0;xIC(1)=5;
+    x_IC(2)=0;x_IC(1)=5;
 end
 
 % (IF WANT TO DEBUG CONTROLLER - INIT ESTIMATOR PERFECTLY)
 % xHat1 = xIC;P1 = 1*eye(2);
-
-% hardcode ta
-%ta = 2;disp('OVERWRITING ta')
-
-% hardcoded sequences for consistent debugging
-%if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
-if(~isempty(strfind(sched,'SISOALL')))
-    % with SISOALL
-    alpha_c(:,1:11) = [1 1 0 0 1 1 0 1 0 0 1];
-    alpha_m(:,1:15) =  [1 1 1 0 1 1 0 0 1 1 0 0 0 1 1];
-elseif(~isempty(strfind(sched,'SISO2')))
-    % with SISO2
-    % Pi_c          =  [1 0 1 0 1 0 1 0 1 0 1 0];
-    % Pi_m          =  [0 1 0 1 0 1 0 1 0 1 0 1];
-    %alpha_m(:,1:15) =  [0 1 0 0 0 1 0 0 0 0 0 1 0 1 0];
-    % one missed, 2 missed
-    
-    alpha_m(:,1:22) =  [0 1 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 1];
-    % 1 - 2 - 4 missed
-    
-elseif(~isempty(strfind(sched,'SISO4')))
-    
-    % with SISO4
-    % Pi_c          =  [1 0 0 0 1 0 0 0 1 0 0 0];
-    % Pi_m          =  [0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 1];
-    alpha_m(:,1:18) =  [0 0 1 0 0 0 1 0 0 0 0 0 0 0 1 0 0 1];
-    % one missed, 2 missed
-    
-end
-
 
 if(strfind(sched,'piggyback'))
     % ACK piggybacked to measurement
@@ -169,39 +131,32 @@ end
 
 %% call sim fcn
 
-% hack to overwrite covPriorAdj and rerun with same everything else
-%covPriorAdj = 0;
-
-% (pull-out run-specific parameters for re-running?)
-
-[r] = simJLSPPC(Ns,Np,A,Bu,Bw,C,Q,Qf,R,W,V,tm,tc,ta,tac,...
-    alpha_cBar,Pi_c,Pi_m,Pi_a,Ts,umax,umin,codebook,Xmax,Xmin,xIC,P1,...
-    xHat1,w,v,alpha_c,alpha_m,alpha_a,covPriorAdj,nACKHistory,printDebug);
-
+[r] = simJLSPPC(SIM_LENGTH,N_HORIZON,A,Bu,Bw,C,Q,Qf,R,W,V,TAU_M,TAU_C,...
+    TAU_A,TAU_AC,ALPHAC_BAR,PI_C,PI_M,PI_A,T_S,U_MAX,U_MIN,CODEBOOK,...
+    Xmax,Xmin,x_IC,P_1,x_hat_1,w,v,alpha_c,alpha_m,alpha_a,...
+    cov_prior_adj,N_ACKHISTORY,print_debug);
 r.sys.sched = sched;
 r.sys.system =system;
-r.sys.alpha_mBar = alpha_mBar;
-r.sys.alpha_aBar = alpha_aBar;
-
+r.sys.ALPHAM_BAR = ALPHAM_BAR;
+r.sys.ALPHAA_BAR = ALPHAA_BAR;
 
 % (save r struct here if want)
 %{
-
-old = cd('C:\Brooks\Dropbox\Research Dropbox\MATLAB Code\JLS-PPC local');
 fname = sprintf('results_%s',dateString('DHM'));
 save(fname,'r')
 
 %or rename r
 uniquer = r;
 save(fname,'uniquer')
-cd(old)
 
 %}
 
 
 %% plots
 
-if(size(C,1)==1 && size(Bu,2)==1)
+% load results struct named "r"
+
+if(size(r.sys.C,1)==1 && size(r.sys.Bu,2)==1)
     
     plotJLSPPC_SISO(r)
     
@@ -209,20 +164,20 @@ else
     
     % very simple MIMO plot:
     
-    NxSys = size(r.P,1);    % underlying system states (no buffer)
-    Ns = size(r.X,2);
+    NX_SYS = size(r.P,1);    % underlying system states (no buffer)
+    SIM_LENGTH = size(r.X,2);
     
-    CPlot = C;
+    CPlot = r.sys.C;
     figure
     subplot(3,1,[1 2])
-    hx = plot(0:Ns-1,CPlot*r.X(1:NxSys,:));
+    hx = plot(0:SIM_LENGTH-1,CPlot*r.X(1:NX_SYS,:));
     hold on
-    hxh = plot(0:Ns-1,CPlot*r.Xh(1:NxSys,:),':');
+    hxh = plot(0:SIM_LENGTH-1,CPlot*r.Xh(1:NX_SYS,:),':');
     legend([hx(1) hxh(1)],'X','XHat')
     title('MIMO System (colors are i/o channels)')
     
     subplot(3,1,3)
-    hu = stairs(repmat(0:Ns-1,[2,1])',r.u');
+    hu = stairs(repmat(0:SIM_LENGTH-1,[2,1])',r.u');
     xlabel('time step')
     ylabel('u')
     

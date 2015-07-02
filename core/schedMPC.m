@@ -1,38 +1,35 @@
-function [U,cost,status,XOut,violateSlack] = schedMPC(xIn,...
-            bHatMPC,kpi,Np,A,Bu,M,E,Q,Qf,R,umax,umin,xmin,xmax,uDB)
+function [U,cost,status,X_Out,violate_slack] = schedMPC(x_In,...
+            b_hat_MPC,p_i,N_HORIZON,A,Bu,M,E,Q,Qf,R,...
+            umax,umin,xmin,xmax,u_deadband)
 % solve deterministic scheduled MPC with cvx 
-% [U,cost,status,XOut,violateSlack] = schedMPC(xIn,...
-%            bHatMPC,kpi,Np,A,Bu,M,E,Q,Qf,R,umax,umin,xmin,xmax,uDB)
-% xIn: (Nx x 1) xHat_{t+tc|t-tm}, bHatMPC: (Nv*Nu*Np x 1) bHat_{t+tc-1}
-% kpi: Nv x 1 vector of #steps to constrain control priors 
-% Np: horizon; A,Bu: system
-% M, E1: buffer shift
-% Q, Qf, R: LQR params
-% umax, umin: (Nu x Np) control constraints
+% [U,cost,status,X_Out,violate_slack] = schedMPC(x_In,...
+%             b_hat_MPC,p_i,N_HORIZON,A,Bu,M,E,Q,Qf,R,...
+%             umax,umin,xmin,xmax,u_deadband)
+% x_In(N_STATES x 1):  x_hat{t+TAU_C|t-TAU_M},
+% b_hat_MPC(N_VEH*N_CONTROLS*N_HORIZON x 1): b_hat{t+TAU_C-1}
+% p_i (Nv x 1) vector of #steps to constrain control priors 
+% N_HORIZON: scalar horizon length
+% A,Bu: system
+% M, E: buffer shift
+% Q, Qf, R: cost function params (states, terminal states, controls)
+% umax, umin: (Nu x N_HORIZON) control constraints
 % xmin and xmax are optional, default is none
 % state constraints implemented with slack variable "barrier"
-% violations ouput gives i (state), j (time step) and violation size
 % uDB is deadband width (NOTE - this makes MPC very slow, requires MIQP
 %   solver such as Gurobi)
 %
 % U is computed plan
-% status is from CVX
-% XOut output gives predicted state trajectory
-
-% BR, 4/29/2014
-%{
-- 4/30/2014: added saturation on control priors (rounding error)
-- 8/17/2014: added uDB (deadband on control actions) -- symmetric
-%}
-
-% v1.0 6/13/2015
+% cost, status from CVX
+% X_Out output gives predicted state trajectory
+% violate_slack is for state constraints (if forced to be violated)
+%   gives i (state), j (time step) and violation size
 
 % TO DO: 
 % try-catch for cvx solver slow on startup?
-% [try a faster solver?]
+% [try a faster solver such as QPOasis?]
 
 if(nargin<15)
-    uDB = [];
+    u_deadband = [];
 end
 
 if(nargin<14)
@@ -50,37 +47,38 @@ if(isempty(umax) || isempty(umin) )
 else
     controlConstraints = 1;
     if(size(umin,2)==1)
-        umin = repmat(umin,[1,Np]);
+        umin = repmat(umin,[1,N_HORIZON]);
     end
     if(size(umax,2)==1)
-        umax = repmat(umax,[1,Np]);
+        umax = repmat(umax,[1,N_HORIZON]);
     end
 end
 
-if(isempty(uDB))
-    uDeadband = 0;
+if(isempty(u_deadband))
+    use_deadband = 0;
 else
-    uDeadband = 1;
-    if(size(uDB,2)==1)
-        uDB = repmat(uDB,[1,Np]);
+    use_deadband = 1;
+    if(size(u_deadband,2)==1)
+        u_deadband = repmat(u_deadband,[1,N_HORIZON]);
     end
 end
 
 if(isempty(xmin) || isempty(xmax))
-    stateConstraints = 0;
-    violateSlack = [];
+    state_constraints = 0;
+    violate_slack = [];
 else
-    stateConstraints = 1;
+    state_constraints = 1;
 end
 
-NU = size(Bu,2); 
-Nx = size(A,1);
-Nv = length(kpi);
-Nu = NU/Nv;
+N_U = size(Bu,2); 
+N_STATES = size(A,1);
+N_v = length(p_i);
+N_u = N_U/N_v;
 
-blockQ = kron(eye(Np),Q);
-blockQ((Np*Nx-Nx+1):Np*Nx,(Np*Nx-Nx+1):Np*Nx) = Qf;
-blockR = kron(eye(Np),R);
+blockQ = kron(eye(N_HORIZON),Q);
+blockQ((N_HORIZON*N_STATES-N_STATES+1):N_HORIZON*N_STATES,...
+    (N_HORIZON*N_STATES-N_STATES+1):N_HORIZON*N_STATES) = Qf;
+blockR = kron(eye(N_HORIZON),R);
 
 cvx_clear
 cvx_begin 
@@ -92,30 +90,30 @@ catch
 end
 cvx_quiet(true)
 
-if(stateConstraints)
-    variable X(Nx,Np+1) 
-    variable U(NU,Np) 
-    variable violateSlack1(Nx,Np+1) 
-    variable violateSlack2(Nx,Np+1) 
-    variable d1(NU,Np) binary
-    variable d2(NU,Np) binary
+if(state_constraints)
+    variable X(N_STATES,N_HORIZON+1) 
+    variable U(N_U,N_HORIZON) 
+    variable violate_slack1(N_STATES,N_HORIZON+1) 
+    variable violate_slack2(N_STATES,N_HORIZON+1) 
+    variable d1(N_U,N_HORIZON) binary
+    variable d2(N_U,N_HORIZON) binary
 else
-    variable X(Nx,Np+1) 
-    variable U(NU,Np) 
-    variable d1(NU,Np) binary
-    variable d2(NU,Np) binary
+    variable X(N_STATES,N_HORIZON+1) 
+    variable U(N_U,N_HORIZON) 
+    variable d1(N_U,N_HORIZON) binary
+    variable d2(N_U,N_HORIZON) binary
 end
 
 % control constraints
 
 
-if(uDeadband)
+if(use_deadband)
     %U >= uDB;
     %U <= -uDB;
-    U - (umin - uDB).*(1-d2) >= uDB;
-    U - (umax - uDB).*d2 <= uDB;
-    U - (umin + uDB).*d1 >= -uDB;
-    U - (umax + uDB).*(1-d1) <= -uDB;
+    U - (umin - u_deadband).*(1-d2) >= u_deadband;
+    U - (umax - u_deadband).*d2 <= u_deadband;
+    U - (umin + u_deadband).*d1 >= -u_deadband;
+    U - (umax + u_deadband).*(1-d1) <= -u_deadband;
     U >= umin.*d1;
     U <= umax.*d2;
     d1+d2 <= 1;
@@ -124,38 +122,38 @@ elseif(controlConstraints)
     U <= umax; U >= umin;
 end
 % add extra constraints equal to priors
-for i = 1:Nv
-    if(kpi(i)>=1)
-        E1i = E((Nu*i-(Nu-1)):(Nu*i),:);
-        for k = 1:kpi(i)
-            UPrior = E1i*M^(k)*bHatMPC;
+for i = 1:N_v
+    if(p_i(i)>=1)
+        Ei = E((N_u*i-(N_u-1)):(N_u*i),:);
+        for k = 1:p_i(i)
+            U_prior = Ei*M^(k)*b_hat_MPC;
             % saturate (in case of rounding error - stay feasible)
-            if(UPrior>=umax(i,k))
-                UPrior=umax(i,k);
+            if(U_prior>=umax(i,k))
+                U_prior=umax(i,k);
             end
-            if(UPrior<=umin(i,k))
-                UPrior=umin(i,k);
+            if(U_prior<=umin(i,k))
+                U_prior=umin(i,k);
             end
-            U((Nu*i-(Nu-1)):(Nu*i),k) == UPrior;
+            U((N_u*i-(N_u-1)):(N_u*i),k) == U_prior;
         end
     end
 end
 
 % state constraints
-if(stateConstraints)
+if(state_constraints)
         
-    violateSlack1 >= 0;
-    violateSlack2 >= 0;
-    X - violateSlack1 <= xmax; X + violateSlack2 >= xmin;
+    violate_slack1 >= 0;
+    violate_slack2 >= 0;
+    X - violate_slack1 <= xmax; X + violate_slack2 >= xmin;
     
 end
 
-X(:,2:Np+1) == A*X(:,1:Np)+Bu*U;
-X(:,1) == xIn; 
+X(:,2:N_HORIZON+1) == A*X(:,1:N_HORIZON)+Bu*U;
+X(:,1) == x_In; 
 
-x = reshape(X(:,2:end),Np*Nx,1);
-u = reshape(U,Np*NU,1);
-if(stateConstraints)        
+x = reshape(X(:,2:end),N_HORIZON*N_STATES,1);
+u = reshape(U,N_HORIZON*N_U,1);
+if(state_constraints)        
     minimize( x'*blockQ*x + u'*blockR*u + ...
         1e8*sum(sum(violateSlack1 + violateSlack2)) )
 else
@@ -167,18 +165,18 @@ status = cvx_status;
 
 % compute "predicted" cost 
 jd = 0;
-for kk = 2:Np
+for kk = 2:N_HORIZON
     jd = jd + X(:,kk)'*Q*X(:,kk) + U(:,kk-1)'*R*U(:,kk-1);
 end
-jd = jd + X(:,Np+1)'*Qf*X(:,Np+1);
+jd = jd + X(:,N_HORIZON+1)'*Qf*X(:,N_HORIZON+1);
 cost = jd;
 
 % plan doesn't include 1st step (xIn)
-XOut = X(:,2:end);
+X_Out = X(:,2:end);
 
-if(stateConstraints)
+if(state_constraints)
     % constraint violations don't either
-    violateSlack = zeros(Nx,Np,2);
-    violateSlack(:,:,1) = violateSlack1(:,2:end);
-    violateSlack(:,:,2) = violateSlack2(:,2:end);
+    violate_slack = zeros(N_STATES,N_HORIZON,2);
+    violate_slack(:,:,1) = violate_slack1(:,2:end);
+    violate_slack(:,:,2) = violate_slack2(:,2:end);
 end
