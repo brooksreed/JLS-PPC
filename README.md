@@ -2,9 +2,7 @@
 Jump Linear System framework for networked control with schedules, delays, packet loss
 
 Link to paper (describes notation, JLS system, algorithms):
-
-Variable names in code closely match the paper in most cases.  
-Constants are in CAPS. 
+(coming soon)
 
 runJLSPPCExamples is the main file for user input -- runs a simulation
 * User input: 
@@ -32,9 +30,11 @@ runJLSPPCExamples is the main file for user input -- runs a simulation
     - x_hat_1 initial estimate
 - (experimental): option to turn on/off covariance prior adjustments in KF    
 
-simJLSPPC runs a simulation using all elements of the framework
+simJLSPPC runs a simulation using all elements of the framework\
+- outputs a struct of results
+
 plotJLSPPC_SISO makes some simple plots for SISO systems
-    - runs after a sim, can also be run after loading a saved results struct
+    - runs after a sim in the example script, can also be run after loading a saved results struct
 
 /core contains the core JLS functions 
 - computePstars: utility function for generating covariance prior adjustment (P*) coefficients
@@ -51,7 +51,11 @@ plotJLSPPC_SISO makes some simple plots for SISO systems
 - schedMPC: solves the MPC optimization with awareness of control packet scheduling 
     - The MPC solver requires CVX and is currently set up to use gurobi (but any QP solver hooked into CVX will do).  Could be modified to use a different solver relatively easily.  
 
-
+Notes: 
+- More detailed comments in code
+- "help <fcn>" should help with i/o
+- Variable names in code closely match the paper in most cases.  
+- Constants are in CAPS. 
 
 
 
