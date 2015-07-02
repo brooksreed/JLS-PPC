@@ -9,8 +9,8 @@ function [results] = simJLSPPC(SIM_LEN,N_HORIZON,A_SYS,Bu_SYS,Bw_SYS,...
 %    w_t,v_t,alpha_c,alpha_m,alpha_a,cov_prior_adj,N_ACKHISTORY,print_debug)
 %
 % inputs approximately match variables in paper
-% covPriorAdj = {1,0} toggle for using cov. prior adjustments in KF
-% printDebug = {1,0} 'global' toggle for debug printouts
+% cov_prior_adj = {1,0} toggle for using cov. prior adjustments in KF
+% print_debug = {1,0} 'global' toggle for debug printouts
 % results: large struct of results
 
 % BR, 4/23/2014
@@ -45,7 +45,7 @@ t_NoACK(:,1:SIM_LEN) = repmat(1:SIM_LEN,[N_VEH,1]);
 % tNoACK(:,start:Ns) = 1:(Ns-start);
 
 % tNoACK *AS KNOWN EACH STEP*
-t_NoACKSave = cell(SIM_LEN);
+t_NoACKSave = cell(1,SIM_LEN);
 
 if(cov_prior_adj)
     disp('COV PRIOR ADJUST ON')
@@ -331,7 +331,9 @@ for t = (TAU_M+1):(SIM_LEN-1)
             
             if(strfind(status,'Solved'))
                 solve_status=1;
-                fprintf('\nt=%d, MPC: %s\n',t,status)
+                if(print_debug)
+                    fprintf('\nt=%d, MPC: %s\n',t,status)
+                end
                 
             elseif( strcmp(status,'Failed') )
                 disp('FAILED')
