@@ -1,6 +1,6 @@
 function [results] = simJLSPPC(SIM_LEN,N_HORIZON,A_SYS,Bu_SYS,Bw_SYS,...
     C_SYS,QMPC,QfMPC,RMPC,W_KF,V_KF,TAU_M,TAU_C,TAU_A,TAU_AC,ALPHAC_BAR,...
-    PI_C,PI_M,PI_A,T_S,U_MAX,U_MIN,CODEBOOK,XMAX,XMIN,X_IC,P_1,X_HAT1,...
+    PI_C,PI_M,PI_A,T_S,U_MAX,U_MIN,CODEBOOK,X_MAX,X_MIN,X_IC,P_1,X_HAT1,...
     w_t,v_t,alpha_c,alpha_m,alpha_a,cov_prior_adj,N_ACKHISTORY,print_debug)
 % runs simulation of JLSPPC
 % [results] = simJLSPPC(SIM_LEN,N_HORIZON,A_SYS,Bu_SYS,Bw_SYS,C_SYS,...
@@ -20,6 +20,8 @@ function [results] = simJLSPPC(SIM_LEN,N_HORIZON,A_SYS,Bu_SYS,Bw_SYS,...
 % Add logging of P*, P**, etc.?
 % Add more tests/checks?
 
+% more verbose debug printouts from KF
+print_debug_KF = 0;
 
 % INITIALIZATION
 NX_SYS = size(A_SYS,1);
@@ -262,7 +264,6 @@ for t = (TAU_M+1):(SIM_LEN-1)
             cov=0;
         end
         
-        print_debug_KF=0;
         if(print_debug_KF~=0)
             print_debug_KF.t = t; print_debug_KF.t_KF = t_KF;
         end
@@ -303,7 +304,7 @@ for t = (TAU_M+1):(SIM_LEN-1)
         MPCtic = tic;
         
         % grab constraints (to accommodate time-varying)
-        [u_max,u_min,xmax,xmin] = paramsNow(U_MAX_T,U_MIN_T,XMAX,XMIN,...
+        [u_max,u_min,xmax,xmin] = paramsNow(U_MAX_T,U_MIN_T,X_MAX,X_MIN,...
             t+1,N_HORIZON);
         
         % Forward propagation: XhMPC and k_p^i's
@@ -341,7 +342,7 @@ for t = (TAU_M+1):(SIM_LEN-1)
                 disp(XhMPC(:,end,t+TAU_C))
                 T_MPC = T_MPC+4;
                 [U_MAX,U_MIN,xmax,xmin] = paramsNow(U_MAX_T,U_MIN_T,...
-                    XMAX,XMIN,t+1,T_MPC);
+                    X_MAX,X_MIN,t+1,T_MPC);
             end
             
             counter = counter+1;

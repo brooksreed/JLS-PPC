@@ -31,7 +31,7 @@ switch system
         Bu = [0.5;1];
         Bw = Bu;
         C = [1 0];      % position output
-        Xmax = [];Xmin = [];
+        X_MAX = [];X_MIN = [];
         CODEBOOK = linspace(U_MIN,U_MAX,N_QUANT_LEVELS);
         
  case 'MIMO_DOUBLE_INTEGRATOR'
@@ -56,7 +56,7 @@ switch system
         Bu = eye(2);
         Bw = Bu;
         C = eye(2);    % full state output
-        Xmax = [];Xmin = [];
+        X_MAX = [];X_MIN = [];
         CODEBOOK = linspace(min(U_MIN),max(U_MAX),N_QUANT_LEVELS);
         
     case 'SCALAR'
@@ -77,11 +77,11 @@ switch system
         P_1 = 9;
         
         % Scalar integrator
-        A =1;
+        A = 1;
         Bu = 1;
         Bw = Bu;
         C = 1;      % position output
-        Xmax = [];Xmin = [];
+        X_MAX = [];X_MIN = [];
         CODEBOOK = linspace(U_MIN,U_MAX,N_QUANT_LEVELS);
         
 end

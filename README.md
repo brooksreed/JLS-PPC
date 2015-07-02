@@ -5,7 +5,7 @@ Link to paper (describes notation, JLS system, algorithms):
 (coming soon)
 
 runJLSPPCExamples is the main file for user input -- runs a simulation
-* User input: 
+User input: 
 - underlying system dynamics
     - some options for these are provided in setupSystemJLSPPC
         - scalar, SISO double integrator, MIMO double integrator
