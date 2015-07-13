@@ -37,14 +37,20 @@ if(isstruct(cov))
     end
     
 elseif(isempty(cov) || cov==0)
+    
     cov_prior_adj = 0;
+    
 end
 
 if( isstruct(pd) )
+    
     t = pd.t; t_KF = pd.t_KF;
     print_debug_kf = 1;
+    
 elseif(isempty(pd) || pd==0)
+    
     print_debug_kf = 0;
+    
 end
 
 % covariance prior (standard)

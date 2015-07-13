@@ -45,7 +45,7 @@ t_NoACK(:,1:SIM_LEN) = repmat(1:SIM_LEN,[N_VEH,1]);
 % tNoACK(:,start:Ns) = 1:(Ns-start);
 
 % tNoACK *AS KNOWN EACH STEP*
-t_NoACKSave = cell(1,SIM_LEN);
+t_NoACK_save = cell(1,SIM_LEN);
 
 if(cov_prior_adj)
     disp('COV PRIOR ADJUST ON')
@@ -160,7 +160,7 @@ for t = (TAU_M+1):(SIM_LEN-1)
     [Dc_hat,alphac_hat,Da,KF_start,t_NoACK,~] = JLSJumpEstimator(Dc_hat,...
         PI_C,Da,alpha_c,alphac_hat,PI_A,T_S,alpha_a,t,TAU_M,TAU_C,...
         TAU_A,TAU_AC,N_CONTROLS_VEH,N_HORIZON,t_NoACK,N_ACKHISTORY,print_debug);
-    t_NoACKSave{t} = t_NoACK;
+    t_NoACK_save{t} = t_NoACK;
     
     if(print_debug)
         disp_start = t-8;
@@ -421,7 +421,7 @@ results.U = U;
 results.u_no_loss = u_no_loss;
 results.b_no_loss = b_no_loss;
 results.t_NoACK = t_NoACK;
-results.t_NoACKSave = t_NoACKSave;
+results.t_NoACK_save = t_NoACK_save;
 
 results.Xh = Xh;
 results.P = P;
