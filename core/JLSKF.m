@@ -99,7 +99,16 @@ if( cov_prior_adj && (max(t_NoACK)>0) )
             Bu*dU(:,t_NoACK)*dU(:,t_NoACK)'*Bu';
         
         if(print_debug_kf)
+            
             % print out sum of Pstar terms
+            
+            % notes on timing debug output: 
+            % t is the global time (at estimator)
+            % t_KF is the a posteriori time step that the KF is updating
+            % tNoACK_KF is the counter for the priors at this step 
+            %   eg --   if u(t_KF-1) has been ACK'd, tNoACK_KF=0
+            %           if not, tNoACK_KF>0    
+            
             if(size(Pstar,1)==1)
                 fprintf('\nt=%d, KF tKF=%d, tNoACK_KF = %d, P* = %f \n',...
                     t, t_KF,t_NoACK,squeeze(sum(Pstar,3)))

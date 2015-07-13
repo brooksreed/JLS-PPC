@@ -158,6 +158,8 @@ end
 
 if(print_debug_JE && (t_sim-TAU_A>1) )
     for i = 1:n_ACKs
+        
+        % if ACK RX'd at t, tNoACK(t-ta)=0
         fprintf('\nt=%d, JE tNoACK(t-ta)=%d, tNoACK^%d(t)=%d\n',...
             t_sim,t_NoACK_mod(i,t_sim-TAU_A),...
             i,t_NoACK_mod(i,t_sim))
