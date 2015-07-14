@@ -10,10 +10,6 @@
 
 % BR, 5/27/2015
 
-% v1.0 6/13/2015
-% v1.1 6/16/2015
-
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -21,7 +17,7 @@ clear variables
 close all
 clc
 
-print_debug = 1;
+print_debug = 0;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SYSTEM DEFINITION
@@ -51,11 +47,11 @@ if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
     % 'SISO2' - [1 0], [0 1] for pi, xi
     % 'SISO4' - [1 0 0 0], [0 0 1 0] for pi, xi
     
-    sched = 'SISO4_piggyback';
+    %sched = 'SISO4_piggyback';
     %sched = 'SISO4_noACK';
     
     %sched = 'SISO2_noACK';
-    %sched = 'SISO2_piggyback';
+    sched = 'SISO2_piggyback';
     
     %sched = 'SISOALL_piggyback';
     %sched = 'SISOALL_noACK';
@@ -83,7 +79,7 @@ TAU_A = 1; % ACK delay
 % eg...  to ACK the newest control command, make N_ACKHISTORY = 1
 %        to ACK newest and previous commands, make N_ACKHISTORY = 1 + T_S
 %        to ACK the newest and 2 prev. cmds, make N_ACKHISTORY = 1 + 2*T_S
-N_ACKHISTORY = 5;
+N_ACKHISTORY = 3;
 
 % adjustment to covariance priors due to no ACKs/control losses:
 cov_prior_adj = 1;
@@ -128,6 +124,8 @@ end
 % (IF WANT TO DEBUG CONTROLLER - INIT ESTIMATOR PERFECTLY)
 % xHat1 = xIC;P1 = 1*eye(2);
 
+% (DEBUG SEQUENCES FOR ACKS)
+%{
 % tests w/ 1 then 2 then 3 missed ACKs
 if(T_S==1)
     alpha_m(1:12) = [1 1 1 0 1 0 0 1 0 0 0 1];
@@ -136,6 +134,7 @@ elseif(T_S==2)
 elseif(T_S==4)
     alpha_m(1:23) = [0 0 1 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1];
 end
+%}
 
 if(strfind(sched,'piggyback'))
     % ACK piggybacked to measurement
