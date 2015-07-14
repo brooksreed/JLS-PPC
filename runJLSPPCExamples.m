@@ -28,7 +28,7 @@ print_debug = 1;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % SIM LENGTH
-SIM_LENGTH = 20; % sim length
+SIM_LENGTH = 25; % sim length
 
 % MPC HORIZON:
 N_HORIZON_MULT = 4; % the MPC horizon Np = Ts*NpMult
@@ -51,11 +51,11 @@ if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
     % 'SISO2' - [1 0], [0 1] for pi, xi
     % 'SISO4' - [1 0 0 0], [0 0 1 0] for pi, xi
     
-    %sched = 'SISO4_piggyback';
+    sched = 'SISO4_piggyback';
     %sched = 'SISO4_noACK';
     
     %sched = 'SISO2_noACK';
-    sched = 'SISO2_piggyback';
+    %sched = 'SISO2_piggyback';
     
     %sched = 'SISOALL_piggyback';
     %sched = 'SISOALL_noACK';
@@ -78,11 +78,15 @@ TAU_M = 1; % meas delay (Also ACK delay with piggyback unless overwritten)
 TAU_A = 1; % ACK delay
 
 % ACK SETTINGS
-% # ACK Histories sent (makes most sense to be multiple of schedule length)
-% For 'SINGLE ACK': sys nACKHistory = Ts (schedule length)
-N_ACKHISTORY = 2;
+% Length of ACK history sent
+% Should be 1 + a multiple of schedule length
+% eg...  to ACK the newest control command, make N_ACKHISTORY = 1
+%        to ACK newest and previous commands, make N_ACKHISTORY = 1 + T_S
+%        to ACK the newest and 2 prev. cmds, make N_ACKHISTORY = 1 + 2*T_S
+N_ACKHISTORY = 5;
+
 % adjustment to covariance priors due to no ACKs/control losses:
-cov_prior_adj = 0;
+cov_prior_adj = 1;
 
 %%%%%%%%%%%%%
 % PACKET SUCCESS PROBABILITIES
@@ -123,6 +127,15 @@ end
 
 % (IF WANT TO DEBUG CONTROLLER - INIT ESTIMATOR PERFECTLY)
 % xHat1 = xIC;P1 = 1*eye(2);
+
+% tests w/ 1 then 2 then 3 missed ACKs
+if(T_S==1)
+    alpha_m(1:12) = [1 1 1 0 1 0 0 1 0 0 0 1];
+elseif(T_S==2)
+    alpha_m(1:22) = [0 1 0 1 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0 0 1];
+elseif(T_S==4)
+    alpha_m(1:23) = [0 0 1 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1];
+end
 
 if(strfind(sched,'piggyback'))
     % ACK piggybacked to measurement
