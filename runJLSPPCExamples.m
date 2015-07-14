@@ -23,7 +23,7 @@ print_debug = 0;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % SIM LENGTH
-SIM_LENGTH = 25; % sim length
+SIM_LENGTH = 30; % sim length
 
 % MPC HORIZON:
 N_HORIZON_MULT = 4; % the MPC horizon Np = Ts*NpMult
@@ -134,6 +134,7 @@ elseif(T_S==4)
     alpha_m(1:23) = [0 0 1 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1];
 end
 %}
+
 
 if(strfind(sched,'piggyback'))
     % ACK piggybacked to measurement
