@@ -51,6 +51,7 @@ t_NoACK(:,1:SIM_LEN) = repmat(1:SIM_LEN,[N_VEH,1]);
 t_NoACK_save = cell(1,SIM_LEN);
 
 Pstar_save = cell(1,SIM_LEN);
+Pstar_overwrite = zeros(1,SIM_LEN);
 
 if(cov_prior_adj)
     disp('COV PRIOR ADJUST ON')
@@ -280,15 +281,32 @@ for t = (TAU_M+1):(SIM_LEN-1)
             NX_SYS,N_VEH,N_CONTROLS_VEH,N_HORIZON,Dm_in,A_KF,Bu_SYS,E,M,C_SYS,...
             W_KF,V_KF,ALPHAC_BAR,cov,pd_KF);
         
-        % log Pstar ...  don't overwrite
+        % log Pstar 
         if(logPstar)
             if(isempty(Pstar_save{t_KF}))
+                
                 % log Pstar array 
                 Pstar_save{t_KF} = Pstar_save_out;
+                
             else
                 if(print_debug_KF)
                     fprintf('\nt=%d, KF tKF=%d, overwriting Pstar\n',t,t_KF)
                 end
+                
+                % If delays are not excessively long vs. n_ACKHistory,
+                % then overwrite should be with empty Pstar
+                % keep the original Pstars in Pstar_save, 
+                % and indicate that this step of Pstar is overwritted
+                if(isempty(Pstar_save_out))
+                    Pstar_overwrite(t_KF) = 1;
+                else
+                    disp('OVERWRITE WITH NONEMPTY PSTAR')
+                    disp(Pstar_save_out)
+                end
+                
+                % version which makes a cell with each successive 
+                % Pstar overwrite.  
+                %{
                 tmp = Pstar_save{t_KF};
                 if(iscell(tmp))
                     tmpsize = length(tmp);
@@ -301,6 +319,8 @@ for t = (TAU_M+1):(SIM_LEN-1)
                 PstarHistory(1:tmpsize) = tmpcell;
                 PstarHistory{tmpsize+1} = Pstar_save_out;
                 Pstar_save{t_KF} = PstarHistory;
+                %}
+                
             end
         end
         
@@ -448,16 +468,17 @@ Jsim = jj + xF'*QMPC*xF;
 results.X = X;
 results.u = u;
 results.U = U;
-
+ 
 results.u_no_loss = u_no_loss;
 results.b_no_loss = b_no_loss;
 results.t_NoACK = t_NoACK;
-results.t_NoACK_save = t_NoACK_save;
 
 results.Xh = Xh;
 results.P = P;
 
+results.t_NoACK_save = t_NoACK_save;
 results.Pstar_save = Pstar_save;
+results.Pstar_overwrite = Pstar_overwrite;
 
 results.XhMPC = XhMPC;
 results.Jcomp = Jcomp;
