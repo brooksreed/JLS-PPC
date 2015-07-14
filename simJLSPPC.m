@@ -23,6 +23,9 @@ function [results] = simJLSPPC(SIM_LEN,N_HORIZON,A_SYS,Bu_SYS,Bw_SYS,...
 % more verbose debug printouts from KF
 print_debug_KF = 1;
 
+% log Pstar
+logPstar = 1;
+
 % INITIALIZATION
 NX_SYS = size(A_SYS,1);
 N_VEH = length(ALPHAC_BAR);
@@ -46,6 +49,8 @@ t_NoACK(:,1:SIM_LEN) = repmat(1:SIM_LEN,[N_VEH,1]);
 
 % tNoACK *AS KNOWN EACH STEP*
 t_NoACK_save = cell(1,SIM_LEN);
+
+PstarSave = cell(1,SIM_LEN);
 
 if(cov_prior_adj)
     disp('COV PRIOR ADJUST ON')
@@ -269,9 +274,33 @@ for t = (TAU_M+1):(SIM_LEN-1)
         end
             
         % Xh(:,t-tm): xHat_{t-tm|t-tm},bHat_{t-tm-1}
-        [Xh(:,t_KF),P(:,:,t_KF)] = JLSKF(Xh_in,P_in,y_in,U_in,Dc_KF_hat,...
+        [Xh(:,t_KF),P(:,:,t_KF),Pstar_save_out] = JLSKF(Xh_in,P_in,y_in,U_in,Dc_KF_hat,...
             NX_SYS,N_VEH,N_CONTROLS_VEH,N_HORIZON,Dm_in,A_KF,Bu_SYS,E,M,C_SYS,...
             W_KF,V_KF,ALPHAC_BAR,cov,pd_KF);
+        
+        % log Pstar ...  don't overwrite
+        if(logPstar)
+            if(isempty(PstarSave{t_KF}))
+                % log Pstar array 
+                PstarSave{t_KF} = Pstar_save_out;
+            else
+                if(print_debug_KF)
+                    fprintf('\nt=%d, KF tKF=%d, overwriting Pstar\n',t,t_KF)
+                end
+                tmp = PstarSave{t_KF};
+                if(iscell(tmp))
+                    tmpsize = length(tmp);
+                    tmpcell = tmp;
+                else
+                    tmpsize = 1;
+                    tmpcell{1} = tmp;
+                end
+                PstarHistory = cell(1,tmpsize+1);
+                PstarHistory(1:tmpsize) = tmpcell;
+                PstarHistory{tmpsize+1} = Pstar_save_out;
+                PstarSave{t_KF} = PstarHistory;
+            end
+        end
         
         if(print_debug)
             if(cov_prior_adj)
@@ -425,6 +454,8 @@ results.t_NoACK_save = t_NoACK_save;
 
 results.Xh = Xh;
 results.P = P;
+
+results.PstarSave = PstarSave;
 
 results.XhMPC = XhMPC;
 results.Jcomp = Jcomp;

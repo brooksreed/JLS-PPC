@@ -10,7 +10,6 @@
 
 % BR, 5/27/2015
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 clear variables
@@ -91,9 +90,9 @@ cov_prior_adj = 1;
 if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
     
     N_VEH = 1;
-    ALPHAC_BAR = .75; % controls
-    ALPHAM_BAR = .75;  % measurements
-    ALPHAA_BAR = .75; % ACKs (if piggyback used, betaBar overrides gammaBar)
+    ALPHAC_BAR = .5; % controls
+    ALPHAM_BAR = .5;  % measurements
+    ALPHAA_BAR = .5; % ACKs (if piggyback used, betaBar overrides gammaBar)
     
 else
     
