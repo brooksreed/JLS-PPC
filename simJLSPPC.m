@@ -50,7 +50,7 @@ t_NoACK(:,1:SIM_LEN) = repmat(1:SIM_LEN,[N_VEH,1]);
 % tNoACK *AS KNOWN EACH STEP*
 t_NoACK_save = cell(1,SIM_LEN);
 
-PstarSave = cell(1,SIM_LEN);
+Pstar_save = cell(1,SIM_LEN);
 
 if(cov_prior_adj)
     disp('COV PRIOR ADJUST ON')
@@ -280,14 +280,14 @@ for t = (TAU_M+1):(SIM_LEN-1)
         
         % log Pstar ...  don't overwrite
         if(logPstar)
-            if(isempty(PstarSave{t_KF}))
+            if(isempty(Pstar_save{t_KF}))
                 % log Pstar array 
-                PstarSave{t_KF} = Pstar_save_out;
+                Pstar_save{t_KF} = Pstar_save_out;
             else
                 if(print_debug_KF)
                     fprintf('\nt=%d, KF tKF=%d, overwriting Pstar\n',t,t_KF)
                 end
-                tmp = PstarSave{t_KF};
+                tmp = Pstar_save{t_KF};
                 if(iscell(tmp))
                     tmpsize = length(tmp);
                     tmpcell = tmp;
@@ -298,7 +298,7 @@ for t = (TAU_M+1):(SIM_LEN-1)
                 PstarHistory = cell(1,tmpsize+1);
                 PstarHistory(1:tmpsize) = tmpcell;
                 PstarHistory{tmpsize+1} = Pstar_save_out;
-                PstarSave{t_KF} = PstarHistory;
+                Pstar_save{t_KF} = PstarHistory;
             end
         end
         
@@ -455,7 +455,7 @@ results.t_NoACK_save = t_NoACK_save;
 results.Xh = Xh;
 results.P = P;
 
-results.PstarSave = PstarSave;
+results.Pstar_save = Pstar_save;
 
 results.XhMPC = XhMPC;
 results.Jcomp = Jcomp;
