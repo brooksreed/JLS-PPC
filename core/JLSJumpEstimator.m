@@ -58,8 +58,8 @@ if( ~isempty(a_inds) && check_start )
         
         % find time range for new ACKs
         % (furthest back in time ACK history will be useful)
-        t_ACK{i} = t_sim-TAU_A-TAU_AC(i) - ...
-            t_NoACK_JE(i):t_sim-TAU_A-TAU_AC(i);
+        t_ACK{i} = (t_sim - TAU_A-TAU_AC(i) - ...
+            t_NoACK_JE(i)):(t_sim-TAU_A-TAU_AC(i));
         
         % constrain tNoACKAlg to be nACKHistory-1?
         % or increment left side +1
