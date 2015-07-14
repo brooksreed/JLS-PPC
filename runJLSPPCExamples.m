@@ -50,9 +50,9 @@ if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
     %sched = 'SISO4_noACK';
     
     %sched = 'SISO2_noACK';
-    sched = 'SISO2_piggyback';
+    %sched = 'SISO2_piggyback';
     
-    %sched = 'SISOALL_piggyback';
+    sched = 'SISOALL_piggyback';
     %sched = 'SISOALL_noACK';
     
 elseif( ~isempty(strfind(system,'MIMO')))
@@ -90,9 +90,9 @@ cov_prior_adj = 1;
 if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
     
     N_VEH = 1;
-    ALPHAC_BAR = .5; % controls
-    ALPHAM_BAR = .5;  % measurements
-    ALPHAA_BAR = .5; % ACKs (if piggyback used, betaBar overrides gammaBar)
+    ALPHAC_BAR = .75; % controls
+    ALPHAM_BAR = .75;  % measurements
+    ALPHAA_BAR = .75; % ACKs (if piggyback used, betaBar overrides gammaBar)
     
 else
     
@@ -134,7 +134,6 @@ elseif(T_S==4)
     alpha_m(1:23) = [0 0 1 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1];
 end
 %}
-
 
 if(strfind(sched,'piggyback'))
     % ACK piggybacked to measurement
