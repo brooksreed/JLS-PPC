@@ -132,6 +132,7 @@ if( (t_sim-TAU_A-1)>0 )
             
             % determine history able to be updated based on this ACK
             % () for clarity - (if nACKHistory=1: just t-ta)
+                        
             t_backup = (t_sim-TAU_A)-(N_ACKHISTORY-1);   
             if(t_backup<1)
                 t_backup = 1;

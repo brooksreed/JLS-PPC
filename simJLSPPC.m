@@ -21,7 +21,7 @@ function [results] = simJLSPPC(SIM_LEN,N_HORIZON,A_SYS,Bu_SYS,Bw_SYS,...
 % Add more tests/checks?
 
 % more verbose debug printouts from KF
-print_debug_KF = 0;
+print_debug_KF = 1;
 
 % INITIALIZATION
 NX_SYS = size(A_SYS,1);
@@ -265,13 +265,13 @@ for t = (TAU_M+1):(SIM_LEN-1)
         end
         
         if(print_debug_KF~=0)
-            print_debug_KF.t = t; print_debug_KF.t_KF = t_KF;
+            pd_KF.t = t; pd_KF.t_KF = t_KF;
         end
             
         % Xh(:,t-tm): xHat_{t-tm|t-tm},bHat_{t-tm-1}
         [Xh(:,t_KF),P(:,:,t_KF)] = JLSKF(Xh_in,P_in,y_in,U_in,Dc_KF_hat,...
             NX_SYS,N_VEH,N_CONTROLS_VEH,N_HORIZON,Dm_in,A_KF,Bu_SYS,E,M,C_SYS,...
-            W_KF,V_KF,ALPHAC_BAR,cov,print_debug_KF);
+            W_KF,V_KF,ALPHAC_BAR,cov,pd_KF);
         
         if(print_debug)
             if(cov_prior_adj)
