@@ -21,7 +21,7 @@ function [results] = simJLSPPC(SIM_LEN,N_HORIZON,A_SYS,Bu_SYS,Bw_SYS,...
 % Add more tests/checks?
 
 % more verbose debug printouts from KF
-print_debug_KF = 1;
+print_debug_KF = 0;
 
 % log Pstar
 logPstar = 1;
@@ -271,6 +271,8 @@ for t = (TAU_M+1):(SIM_LEN-1)
         
         if(print_debug_KF~=0)
             pd_KF.t = t; pd_KF.t_KF = t_KF;
+        else
+            pd_KF = 0;
         end
             
         % Xh(:,t-tm): xHat_{t-tm|t-tm},bHat_{t-tm-1}
