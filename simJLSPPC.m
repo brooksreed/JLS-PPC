@@ -374,8 +374,12 @@ for t = (TAU_M+1):(SIM_LEN-1)
         T_MPC = N_HORIZON;
         while(solve_status==0)
             
+            % note -- logged variables corresponding to U(t+TAU_C) have
+            % time index t+TAU_C as well 
+            % (even though control computed at time t)
+            
             % compute U_{t+tc}^i, forall i s.t. {Pi_c(i,t) = 1}
-            [U_MPC,Jcomp(t),status,X_plan_out,~] = schedMPC(XhMPC(1:NX_SYS,...
+            [U_MPC,Jcomp(t+TAU_C),status,X_plan_out,~] = schedMPC(XhMPC(1:NX_SYS,...
                 end,t+TAU_C),XhMPC((NX_SYS+1):end,end,t+TAU_C),p_i,...
                 T_MPC,A_SYS,Bu_SYS,M,E,QMPC,QfMPC,RMPC,u_max,u_min,...
                 xmin,xmax,[]);
@@ -402,13 +406,13 @@ for t = (TAU_M+1):(SIM_LEN-1)
             if(counter>2)
                 disp('MAXCOUNTER')
                 U_MPC = zeros(N_CONTROLS_ALL,N_HORIZON);
-                MPC_fail(t) = 1;
+                MPC_fail(t+TAU_C) = 1;
                 break
             end
             
         end
         U_MPC = U_MPC(:,1:N_HORIZON);    % truncate if TMPC>Np
-        X_plan(:,:,t) = X_plan_out(:,1:N_HORIZON);
+        X_plan(:,:,t+TAU_C) = X_plan_out(:,1:N_HORIZON);
         
         MPC_time(t) = toc(MPCtic);
         
