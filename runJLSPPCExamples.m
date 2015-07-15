@@ -10,7 +10,6 @@
 
 % BR, 5/27/2015
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 clear variables
@@ -24,7 +23,7 @@ print_debug = 0;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % SIM LENGTH
-SIM_LENGTH = 25; % sim length
+SIM_LENGTH = 30; % sim length
 
 % MPC HORIZON:
 N_HORIZON_MULT = 4; % the MPC horizon Np = Ts*NpMult
@@ -51,9 +50,9 @@ if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
     %sched = 'SISO4_noACK';
     
     %sched = 'SISO2_noACK';
-    sched = 'SISO2_piggyback';
+    %sched = 'SISO2_piggyback';
     
-    %sched = 'SISOALL_piggyback';
+    sched = 'SISOALL_piggyback';
     %sched = 'SISOALL_noACK';
     
 elseif( ~isempty(strfind(system,'MIMO')))

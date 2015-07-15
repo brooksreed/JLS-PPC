@@ -1,7 +1,11 @@
-function [hf] = plotJLSPPC_SISO(r)
+function [hf] = plotJLSPPC_SISO(r,plotCov)
 % plots (for SISO systems)
 % r structure of results
 % also r.sys: system settings (only TAU_C required right now)
+
+if(nargin<2)
+    plotCov=0;
+end
 
 % in r struct, P is a proxy for size of A
 if(size(r.P,1)==2)
@@ -59,18 +63,19 @@ legend('u true','u planned')
 %legend('u','w')
 xlabel('time step')
 
-if(size(r.P,1)==1)
-    figure
-    plot(sqrt(squeeze(r.P)))
-    xlabel('time step')
-elseif(size(r.P,1)==2)
-    P11 = sqrt(squeeze(r.P(1,1,:)));
-    P22 = sqrt(squeeze(r.P(2,2,:)));
-    P12 = sqrt(squeeze(r.P(1,2,:)));
-    figure
-    plot([P11,P22,P12])
-    xlabel('time step')
-    legend('P_{11}^{(1/2)}','P_{22}^{(1/2)}','P_{12}^{(1/2)}')
+if(plotCov)
+    if(size(r.P,1)==1)
+        figure
+        plot(sqrt(squeeze(r.P)))
+        xlabel('time step')
+    elseif(size(r.P,1)==2)
+        P11 = sqrt(squeeze(r.P(1,1,:)));
+        P22 = sqrt(squeeze(r.P(2,2,:)));
+        P12 = sqrt(squeeze(r.P(1,2,:)));
+        figure
+        plot([P11,P22,P12])
+        xlabel('time step')
+        legend('P_{11}^{(1/2)}','P_{22}^{(1/2)}','P_{12}^{(1/2)}')
+    end
 end
-    
 

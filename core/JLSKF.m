@@ -1,6 +1,6 @@
-function [XHat_out,P_out] = JLSKF(XHat_in,P_in,y_KF,U_sent,Dc_hat_all,...
-    N_STATES,N_AGENTS,N_CONTROLS,N_HORIZON,Dm_now,A,Bu,E,M,C,W,V,...
-    ALPHAC_BAR,cov,pd)
+function [XHat_out,P_out,Pstar_out] = JLSKF(XHat_in,P_in,y_KF,U_sent,...
+    Dc_hat_all,N_STATES,N_AGENTS,N_CONTROLS,N_HORIZON,Dm_now,...
+    A,Bu,E,M,C,W,V,ALPHAC_BAR,cov,pd)
 % Kalman filter for missed measurements and controls
 % [XHat_out,P_out] = JLSKF(XHat_in,P_in,y_KF,U_sent,Dc_hat_all,...
 %     N_STATES,N_AGENTS,N_CONTROLS,N_HORIZON,Dm_now,A,Bu,E,M,C,W,V,...
@@ -35,12 +35,13 @@ if(isstruct(cov))
         Pstar_final_coefficients = cov.Pstar_final_coefficients;
         n_stars = length(Pstar_coefficients);
     end
-    
 elseif(isempty(cov) || cov==0)
     
     cov_prior_adj = 0;
     
 end
+
+Pstar_out = [];
 
 if( isstruct(pd) )
     
@@ -156,6 +157,9 @@ if( cov_prior_adj && (max(t_NoACK)>0) )
         
         
     end
+    
+    Pstar_out = Pstar;
+    
 else
     
     P_pre = P_pre_0;
