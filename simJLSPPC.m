@@ -375,7 +375,7 @@ for t = (TAU_M+1):(SIM_LEN-1)
         while(solve_status==0)
             
             % compute U_{t+tc}^i, forall i s.t. {Pi_c(i,t) = 1}
-            [U_MPC,Jcomp(t),status,X_plan,~] = schedMPC(XhMPC(1:NX_SYS,...
+            [U_MPC,Jcomp(t),status,X_plan_out,~] = schedMPC(XhMPC(1:NX_SYS,...
                 end,t+TAU_C),XhMPC((NX_SYS+1):end,end,t+TAU_C),p_i,...
                 T_MPC,A_SYS,Bu_SYS,M,E,QMPC,QfMPC,RMPC,u_max,u_min,...
                 xmin,xmax,[]);
@@ -408,7 +408,7 @@ for t = (TAU_M+1):(SIM_LEN-1)
             
         end
         U_MPC = U_MPC(:,1:N_HORIZON);    % truncate if TMPC>Np
-        X_plan(:,:,t) = X_plan(:,1:N_HORIZON);
+        X_plan(:,:,t) = X_plan_out(:,1:N_HORIZON);
         
         MPC_time(t) = toc(MPCtic);
         
