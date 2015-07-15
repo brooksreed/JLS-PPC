@@ -108,7 +108,7 @@ got_ACK = zeros(size(Da_mod,3));
 for i = 1:length(a_inds)
     got_ACK(a_inds(i)) = 1;
     if(print_debug_JE)
-        fprintf('\nt=%d, JE GOT ACK, channel %d \n',t_sim,i)
+        fprintf('\nt=%d, JE GOT ACK, channel %d \n',t_sim,a_inds(i))
     end
 end
 

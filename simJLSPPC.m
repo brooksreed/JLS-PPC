@@ -153,10 +153,10 @@ for t = (TAU_M+1):(SIM_LEN-1)
         fprintf('\n~~~STEP t=%d AT ESTIMATOR~~~\n',t)
         for i = 1:N_VEH
             if(PI_M(i,t-TAU_M)*alpha_m(i,t-TAU_M)==1)
-                fprintf('\nt=%d, t-%d Meas %d RX success\n',t,i,TAU_M)
+                fprintf('\nt=%d, Meas %d (sent at %d) RX success\n',t,i,t-TAU_M)
             end
         end
-    end
+    end  
     
     % determine ACKs available at this step
     % update Dh (and alphaHat), KFstart
@@ -173,7 +173,7 @@ for t = (TAU_M+1):(SIM_LEN-1)
         disp_end = t+T_S+2;
         if(disp_start<1);disp_start=1;end
         if(disp_end>SIM_LEN);disp_end=SIM_LEN;end
-        fprintf('\n tNoACK(%d:%d):',disp_start,disp_end)
+        fprintf('\n tNoACK(%d:%d):\n',disp_start,disp_end)
         disp(t_NoACK(:,disp_start:disp_end))
     end
     
