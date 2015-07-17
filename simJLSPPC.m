@@ -51,7 +51,7 @@ t_NoACK(:,1:SIM_LEN) = repmat(1:SIM_LEN,[N_VEH,1]);
 t_NoACK_save = cell(1,SIM_LEN);
 
 Pstar_save = cell(1,SIM_LEN);
-Pstar_overwrite = zeros(1,SIM_LEN);
+if(N_VEH==1);Pstar_overwrite = zeros(1,SIM_LEN);end
 
 if(cov_prior_adj)
     disp('COV PRIOR ADJUST ON')
@@ -283,44 +283,46 @@ for t = (TAU_M+1):(SIM_LEN-1)
         
         % log Pstar 
         if(logPstar)
+            
             if(isempty(Pstar_save{t_KF}))
                 
                 % log Pstar array 
                 Pstar_save{t_KF} = Pstar_save_out;
                 
             else
+                
+                % backup-and-rerun is overwriting previously set Pstar
                 if(print_debug_KF)
                     fprintf('\nt=%d, KF tKF=%d, overwriting Pstar\n',t,t_KF)
                 end
                 
-                % If delays are not excessively long vs. n_ACKHistory,
-                % then overwrite should be with empty Pstar
-                % keep the original Pstars in Pstar_save, 
-                % and indicate that this step of Pstar is overwritted
-                if(isempty(Pstar_save_out))
-                    Pstar_overwrite(t_KF) = 1;
+                if(N_VEH==1)
+                    % If delays are not excessively long vs. n_ACKHistory,
+                    %   then only overwrites should be with empty Pstar
+                    % --> keep the original Pstars in Pstar_save, 
+                    %   and indicate that this step of Pstar is overwritted
+                    if(isempty(Pstar_save_out))
+                        Pstar_overwrite(t_KF) = 1;
+                    else
+                        disp('warning -- OVERWRITE WITH NONEMPTY PSTAR')
+                        disp(Pstar_save_out)
+                    end
                 else
-                    disp('OVERWRITE WITH NONEMPTY PSTAR')
-                    disp(Pstar_save_out)
+                    % makes a cell with each successive Pstar overwrite.  
+                    tmp = Pstar_save{t_KF};
+                    if(iscell(tmp))
+                        tmpsize = length(tmp);
+                        tmpcell = tmp;
+                    else
+                        tmpsize = 1;
+                        tmpcell{1} = tmp;
+                    end
+                    PstarHistory = cell(1,tmpsize+1);
+                    PstarHistory(1:tmpsize) = tmpcell;
+                    PstarHistory{tmpsize+1} = Pstar_save_out;
+                    Pstar_save{t_KF} = PstarHistory;
+                    clear tmpcell
                 end
-                
-                % version which makes a cell with each successive 
-                % Pstar overwrite.  
-                %{
-                tmp = Pstar_save{t_KF};
-                if(iscell(tmp))
-                    tmpsize = length(tmp);
-                    tmpcell = tmp;
-                else
-                    tmpsize = 1;
-                    tmpcell{1} = tmp;
-                end
-                PstarHistory = cell(1,tmpsize+1);
-                PstarHistory(1:tmpsize) = tmpcell;
-                PstarHistory{tmpsize+1} = Pstar_save_out;
-                Pstar_save{t_KF} = PstarHistory;
-                %}
-                
             end
         end
         

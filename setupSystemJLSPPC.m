@@ -37,8 +37,8 @@ switch system
  case 'MIMO_DOUBLE_INTEGRATOR'
      
         % controller settings
-        U_MAX = [10;10];
-        U_MIN = [-10;-10];
+        U_MAX = [1;10];
+        U_MIN = [-1;-10];
         N_QUANT_LEVELS = 15;   % quantization levels
         Q = [10,0;0,1];
         Qf = 10*Q;

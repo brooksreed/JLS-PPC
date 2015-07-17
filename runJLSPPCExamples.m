@@ -23,7 +23,7 @@ print_debug = 1;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % SIM LENGTH
-SIM_LENGTH = 50; % sim length
+SIM_LENGTH = 100; % sim length
 
 % MPC HORIZON:
 N_HORIZON_MULT = 4; % the MPC horizon Np = Ts*NpMult
@@ -78,7 +78,7 @@ TAU_A = 1; % ACK delay
 % eg...  to ACK the newest control command, make N_ACKHISTORY = 1
 %        to ACK newest and previous commands, make N_ACKHISTORY = 1 + T_S
 %        to ACK the newest and 2 prev. cmds, make N_ACKHISTORY = 1 + 2*T_S
-N_ACKHISTORY = 1;
+N_ACKHISTORY = 7;
 
 % adjustment to covariance priors due to no ACKs/control losses:
 cov_prior_adj = 1;
