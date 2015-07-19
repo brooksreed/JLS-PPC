@@ -35,17 +35,21 @@ N_W = size(Bw_SYS,2);
 N_Y_ALL = size(C_SYS,1);
 N_Y_VEH = N_Y_ALL/N_VEH;
 
-% initialize tNoACK to zeros (no ACK for 'step 0')
+% initialize tNoACK 
 t_NoACK = zeros(N_VEH,SIM_LEN);
-
-% If initial controls unknown
-t_NoACK(:,1:SIM_LEN) = repmat(1:SIM_LEN,[N_VEH,1]);
+% first period of controls are known
+[~,tmp] = find(PI_C(:,1:T_S));
+tmp = tmp+TAU_AC+(TAU_C+TAU_A);
+for i = 1:N_VEH
+    t_NoACK(i,tmp(i):end) = 1:(SIM_LEN-tmp(i)+1);
+end
 
 % after first planned control RX, unknown
 % initialize based on 2nd pi_c + tau_c ?? (need tau_ac too?)
 % tmp = find(pi_c);
 % start = tmp(2)+tc
 % tNoACK(:,start:Ns) = 1:(Ns-start);
+    %repmat(1:SIM_LEN,[N_VEH,1]);
 
 % tNoACK *AS KNOWN EACH STEP*
 t_NoACK_save = cell(1,SIM_LEN);
@@ -232,6 +236,7 @@ for t = (TAU_M+1):(SIM_LEN-1)
             if(N_VEH>1)
                 for i = 1:N_VEH
                     if( (t_KF+TAU_AC(i)-1)>0 && ...
+                            (t_KF+TAU_AC(i)-1)<SIM_LEN && ...
                             (t_NoACK(i,t_KF+TAU_AC(i)-1)==0) )
                         u_options(i,1) = 0;
                     end

@@ -97,10 +97,7 @@ switch system
         CODEBOOK = linspace(min(U_MIN),max(U_MAX),N_QUANT_LEVELS);
         
     case 'MIMO_RELATIVE_MEASUREMENTS'
-        
-        % FIRST: test hardcoded 3 mass system
-        % eventually -- variable size
-                
+
         % controller settings
         U_MAX = 10*ones(N_VEH,1);
         U_MIN = -10*ones(N_VEH,1);
@@ -111,8 +108,8 @@ switch system
         R = eye(N_VEH);
                
         % process/measurement noise
-        W_gen = eye(N_VEH); % cov for process noise input with Bw
-        V = eye(N_VEH);
+        W_gen = .01*eye(N_VEH); % cov for process noise input with Bw
+        V = .05*eye(N_VEH);
         
         % cov... uncertain position but better-known velocity (closer to zero)
         P_11 = [25,0;0,9];  
@@ -123,14 +120,18 @@ switch system
         A1 =[1,1;0,1];
         Bu1 = [0.5;1];
         
-        A = kron(eye(3),A1);
-        Bu = kron(eye(3),Bu1);
+        A = kron(eye(N_VEH),A1);
+        Bu = kron(eye(N_VEH),Bu1);
         Bw = Bu;
         
         % C: relative position measurements
-        % (maybe velocity too?)
-        C = [1 0 0 0 0 0;-1 0 1 0 0 0;0 0 -1 0 1 0];
-          
+        C = zeros(N_VEH,size(A,1));
+        C(1,1) = 1;
+        for i = 2:N_VEH
+            C(i,(2*i-3)) = -1;
+            C(i,(2*i-1)) = 1;
+        end
+        
         X_MAX = [];X_MIN = [];
         CODEBOOK = linspace(min(U_MIN),max(U_MAX),N_QUANT_LEVELS);
           

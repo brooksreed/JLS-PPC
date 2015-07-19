@@ -35,14 +35,14 @@ N_HORIZON_MULT = 4; % the MPC horizon Np = Ts*NpMult
 %system = 'SCALAR';N_VEH = 1;
 
 % mass with force input, position feedback
-system = 'SISO_DOUBLE_INTEGRATOR';N_VEH = 1;
+%system = 'SISO_DOUBLE_INTEGRATOR';N_VEH = 1;
 
 % mass with force and velocity input, position and velocity feedback
 % separate comms channels for each input and output
 %system = 'MIMO_DOUBLE_INTEGRATOR';N_VEH = 2;
 
 % 1D "formation flying" - relative measurements
-%system = 'MIMO_RELATIVE_MEASUREMENTS';N_VEH = 3;
+system = 'MIMO_RELATIVE_MEASUREMENTS';N_VEH = 4;
 
 
 %%%%%%%%%%%
@@ -69,8 +69,8 @@ elseif( ~isempty(strfind(system,'MIMO')))
     
     % 'MIMO' options: MX, IL
     
-    sched = 'MX_piggyback';
-    %sched = 'MX_noACK';
+    %sched = 'MX_piggyback';
+    sched = 'MX_noACK';
     
     %sched = 'IL_piggyback';
     %sched = 'IL_noACK';
@@ -88,7 +88,7 @@ TAU_A = 1; % ACK delay
 % eg...  to ACK the newest control command, make N_ACKHISTORY = 1
 %        to ACK newest and previous commands, make N_ACKHISTORY = 1 + T_S
 %        to ACK the newest and 2 prev. cmds, make N_ACKHISTORY = 1 + 2*T_S
-N_ACKHISTORY = 5;
+N_ACKHISTORY = 9;
 
 % adjustment to covariance priors due to no ACKs/control losses:
 cov_prior_adj = 1;
@@ -100,9 +100,9 @@ cov_prior_adj = 1;
 if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
     
     N_VEH = 1;
-    ALPHAC_BAR = .75; % controls
-    ALPHAM_BAR = .75;  % measurements
-    ALPHAA_BAR = .75; % ACKs (if piggyback used, betaBar overrides gammaBar)
+    ALPHAC_BAR = .6; % controls
+    ALPHAM_BAR = .6;  % measurements
+    ALPHAA_BAR = .6; % ACKs (if piggyback used, betaBar overrides gammaBar)
     
 else
     
@@ -111,9 +111,9 @@ else
     %ALPHAM_BAR = [.75;.75];
     %ALPHAA_BAR = [.75;.75];
     
-    ALPHAC_BAR = .75*ones(N_VEH,1);
-    ALPHAM_BAR = .75*ones(N_VEH,1);
-    ALPHAA_BAR = .75*ones(N_VEH,1);
+    ALPHAC_BAR = .9*ones(N_VEH,1);
+    ALPHAM_BAR = .9*ones(N_VEH,1);
+    ALPHAA_BAR = .9*ones(N_VEH,1);
     
 end
 
@@ -124,9 +124,10 @@ setupSystemJLSPPC
 
 % initial conditions
 x_IC = 5*randn(size(A,1),1);
-if(size(A,1)==2)
+if(size(A,1)>1)
     % position only, no initial velocity (so like step resp from rest)
-    x_IC(2)=0;x_IC(1)=5;
+    %x_IC(2)=0;x_IC(1)=5;
+    x_IC(2:2:end) = 0;
 end
 
 % (IF WANT TO DEBUG CONTROLLER - INIT ESTIMATOR PERFECTLY)
@@ -186,8 +187,13 @@ else
     
     NX_SYS = size(r.P,1);    % underlying system states (no buffer)
     SIM_LENGTH = size(r.X,2);
-    
+        
     CPlot = r.sys.C;
+    if(strcmp(system,'MIMO_RELATIVE_MEASUREMENTS'))
+        CPlot = CPlot>0;
+        % (plots positions of each mass, as opposed to the measured output
+        % which is their relative positions)
+    end
     figure
     subplot(3,1,[1 2])
     hx = plot(0:SIM_LENGTH-1,CPlot*r.X(1:NX_SYS,:));
