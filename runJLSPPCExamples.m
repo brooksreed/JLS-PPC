@@ -35,14 +35,14 @@ N_HORIZON_MULT = 4; % the MPC horizon Np = Ts*NpMult
 %system = 'SCALAR';N_VEH = 1;
 
 % mass with force input, position feedback
-%system = 'SISO_DOUBLE_INTEGRATOR';N_VEH = 1;
+system = 'SISO_DOUBLE_INTEGRATOR';N_VEH = 1;
 
 % mass with force and velocity input, position and velocity feedback
 % separate comms channels for each input and output
 %system = 'MIMO_DOUBLE_INTEGRATOR';N_VEH = 2;
 
 % 1D "formation flying" - relative measurements
-system = 'MIMO_RELATIVE_MEASUREMENTS';N_VEH = 3;
+%system = 'MIMO_RELATIVE_MEASUREMENTS';N_VEH = 3;
 
 
 %%%%%%%%%%%
@@ -60,9 +60,9 @@ if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
     %sched = 'SISO4_noACK';
     
     %sched = 'SISO2_noACK';
-    %sched = 'SISO2_piggyback';
+    sched = 'SISO2_piggyback';
     
-    sched = 'SISOALL_piggyback';
+    %sched = 'SISOALL_piggyback';
     %sched = 'SISOALL_noACK';
     
 elseif( ~isempty(strfind(system,'MIMO')))

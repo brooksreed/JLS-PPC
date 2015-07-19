@@ -54,8 +54,9 @@ elseif(isempty(pd) || pd==0)
     
 end
 
-% covariance prior (standard)
-P_pre_0 = A*P_in*A' + W ; %P_{t+1|t}
+% P_{t+1|t} covariance prior (standard)
+% note - if needed, this W should be scaled by Bw (as in setupSystemJLSPPC) 
+P_pre_0 = A*P_in*A' + W ; 
 
 if( cov_prior_adj && (max(t_NoACK)>0) )
     
