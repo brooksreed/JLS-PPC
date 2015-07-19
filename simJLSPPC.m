@@ -484,7 +484,7 @@ results.P = P;
 
 results.t_NoACK_save = t_NoACK_save;
 results.Pstar_save = Pstar_save;
-results.Pstar_overwrite = Pstar_overwrite;
+if(N_VEH==1);results.Pstar_overwrite = Pstar_overwrite;end
 
 results.XhMPC = XhMPC;
 results.Jcomp = Jcomp;

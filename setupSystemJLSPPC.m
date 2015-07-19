@@ -102,8 +102,8 @@ switch system
         % eventually -- variable size
                 
         % controller settings
-        U_MAX = 10*ones(1,N_VEH);
-        U_MIN = -10*ones(1,N_VEH);
+        U_MAX = 10*ones(N_VEH,1);
+        U_MIN = -10*ones(N_VEH,1);
         N_QUANT_LEVELS = 9;   % quantization levels
         Q1 = [10,0;0,1];
         Q = kron(eye(N_VEH),Q1);

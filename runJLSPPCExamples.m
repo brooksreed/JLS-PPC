@@ -88,7 +88,7 @@ TAU_A = 1; % ACK delay
 % eg...  to ACK the newest control command, make N_ACKHISTORY = 1
 %        to ACK newest and previous commands, make N_ACKHISTORY = 1 + T_S
 %        to ACK the newest and 2 prev. cmds, make N_ACKHISTORY = 1 + 2*T_S
-N_ACKHISTORY = 7;
+N_ACKHISTORY = 5;
 
 % adjustment to covariance priors due to no ACKs/control losses:
 cov_prior_adj = 1;
@@ -197,7 +197,7 @@ else
     title('MIMO System (colors are i/o channels)')
     
     subplot(3,1,3)
-    hu = stairs(repmat(0:SIM_LENGTH-1,[2,1])',r.u');
+    hu = stairs(repmat(0:SIM_LENGTH-1,[N_VEH,1])',r.u');
     xlabel('time step')
     ylabel('u')
     
