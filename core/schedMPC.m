@@ -82,12 +82,9 @@ blockR = kron(eye(N_HORIZON),R);
 
 cvx_clear
 cvx_begin 
-try
-    % first choice not installed with CVX
-    cvx_solver gurobi
-catch 
-    cvx_solver sedumi
-end
+
+% cvx_solver gurobi 
+% cvx_solver mosek
 cvx_quiet(true)
 
 if(state_constraints)

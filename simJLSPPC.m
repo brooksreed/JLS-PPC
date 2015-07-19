@@ -201,26 +201,16 @@ for t = (TAU_M+1):(SIM_LEN-1)
                         
             % determine tNoACK vector for specific filter step
             if(N_VEH==1)
+                
                 if( (t_KF+TAU_AC-1)>0 )
                     t_NoACK_KF = t_NoACK(1,t_KF+TAU_AC-1);
                 else
                     t_NoACK_KF = 1;
                 end
+                
             else
                 
-                % KEEP THIS?  OR MODIFY FOR JUST >0 OR NOT
-                %{
-                t_NoACK_KF = zeros(1,N_VEH);
-                for i = 1:Nv
-                    if(t_KF-1-TAU_AC(i)>0)
-                        t_NoACK_KF(i) = t_NoACK(i,t_KF+TAU_AC(i)-1);
-                    end
-                end
-                %} 
-
-                % (artificially constrain dU to zero for ACK'd channels?)
-                % (DO THIS HERE? OR INSIDE KF?)
-                
+                % one-step approx
                 t_NoACK_KF = 1;
                 
             end
@@ -237,6 +227,17 @@ for t = (TAU_M+1):(SIM_LEN-1)
                 end
                 u_options(:,k) = E*M^k*bTMP;
             end
+            
+            % overwrite u_options to zero if channel is ACK'd
+            if(N_VEH>1)
+                for i = 1:N_VEH
+                    if( (t_KF+TAU_AC(i)-1)>0 && ...
+                            (t_NoACK(i,t_KF+TAU_AC(i)-1)==0) )
+                        u_options(i,1) = 0;
+                    end
+                end
+            end
+            
             
         else
             

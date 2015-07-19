@@ -62,9 +62,9 @@ if( cov_prior_adj && (max(t_NoACK)>0) )
     % SENT control command for step t
     u_t = E*U_sent;
     
-    dU = zeros(size(u_t,1),max(t_NoACK));
+    q = zeros(size(u_t,1),max(t_NoACK));
     for i = 1:max(t_NoACK)
-        dU(:,i) = (u_t - u_options(:,i));
+        q(:,i) = (u_t - u_options(:,i));
     end
     
     % Single input systems
@@ -92,12 +92,12 @@ if( cov_prior_adj && (max(t_NoACK)>0) )
             % coefficients for all except last term:
             for j = 1:(t_NoACK-1)
                 Pstar(:,:,j) = Pstar_coefficients(j)*...
-                    Bu*dU(:,j)*dU(:,j)'*Bu';
+                    Bu*q(:,j)*q(:,j)'*Bu';
             end
         end
         % separate coefficient form for the last term:
         Pstar(:,:,t_NoACK) = Pstar_final_coefficients(t_NoACK)*...
-            Bu*dU(:,t_NoACK)*dU(:,t_NoACK)'*Bu';
+            Bu*q(:,t_NoACK)*q(:,t_NoACK)'*Bu';
         
         if(print_debug_kf)
             
@@ -134,18 +134,18 @@ if( cov_prior_adj && (max(t_NoACK)>0) )
         % (zero out dU manually for ACK'd channels - need to test)
         for i = 1:length(t_NoACK)
             if(t_NoACK(i) == 0)
-                dU(i,1) = 0;
+                q(i,1) = 0;
             end
         end
         
         % off diagonal elements
-        E_AZA = diag(ALPHAC_BAR)*dU(:,1)*dU(:,1)'*diag(ALPHAC_BAR);
+        E_AZA = diag(ALPHAC_BAR)*q(:,1)*q(:,1)'*diag(ALPHAC_BAR);
         
         % replace diagonal elements
-        dum = diag(ALPHAC_BAR)*dU(:,1)*dU(:,1)';
+        dum = diag(ALPHAC_BAR)*q(:,1)*q(:,1)';
         for i = 1:N_CONTROLS; E_AZA(i,i) = dum(i,i) ; end;
         
-        Pstar = Bu*(E_AZA - diag(ALPHAC_BAR)*dU(:,1)*dU(:,1)'*...
+        Pstar = Bu*(E_AZA - diag(ALPHAC_BAR)*q(:,1)*q(:,1)'*...
             diag(ALPHAC_BAR))*Bu';
         
         P_pre = P_pre_0 + Pstar;

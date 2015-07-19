@@ -27,7 +27,7 @@ switch system
         R = 1;
         
         % process/measurement noise
-        W_gen = 1;
+        W_gen = 1;  % cov for process noise input with Bw
         V = 1;
         
         % initial covariance
@@ -54,7 +54,7 @@ switch system
         R = 1;
         
         % process/measurement noise
-        W_gen = 1;
+        W_gen = 1;  % cov for process noise input with Bw
         V = 1;
                 
         % cov... uncertain position but better-known velocity (closer to zero)
@@ -82,7 +82,7 @@ switch system
         R = eye(2);
                
         % process/measurement noise
-        W_gen = eye(2);
+        W_gen = eye(2); % cov for process noise input with Bw
         V = eye(2);
         
         % cov... uncertain position but better-known velocity (closer to zero)
@@ -111,7 +111,7 @@ switch system
         R = eye(N_VEH);
                
         % process/measurement noise
-        W_gen = eye(N_VEH);
+        W_gen = eye(N_VEH); % cov for process noise input with Bw
         V = eye(N_VEH);
         
         % cov... uncertain position but better-known velocity (closer to zero)
@@ -136,7 +136,7 @@ switch system
           
 end
 
-% make W for KF based on W_gen
+% make W for KF based on W_gen (KF uses APA' + W form)
 W = Bw*W_gen*Bw';
 
 % check
@@ -157,7 +157,7 @@ end
 x_hat_1 = zeros(size(A,1),1);
 
 % random time-series realizations
-% note -- use W_gen here (Bw*w is used in state update)
+% note -- use W_gen here (Bw*w is the process noise input)
 w = sqrt(W_gen)*randn(size(Bw,2),SIM_LENGTH);
 v = sqrt(V)*randn(size(C,1),SIM_LENGTH);
 
