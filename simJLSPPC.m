@@ -136,7 +136,7 @@ y(:,1) = C_SYS*X_IC+v_t(:,1);
 X(NX_SYS+1:end,1) = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,1);
 
 % first step propagation - gives x_2
-X(1:NX_SYS,2) =  A_SYS*X_IC + w_t(:,1);
+X(1:NX_SYS,2) =  A_SYS*X_IC + Bw_SYS*w_t(:,1);
 y(:,2) = C_SYS*X(1:NX_SYS,1) + v_t(:,2);
 u(:,1) = E*X(NX_SYS+1:end,1);
 

@@ -31,9 +31,19 @@ N_HORIZON_MULT = 4; % the MPC horizon Np = Ts*NpMult
 %%%%%%%%%%%
 % SYSTEM (set up in setupSystemJPLPPC)
 
-%system = 'SISO_DOUBLE_INTEGRATOR';
-system = 'MIMO_DOUBLE_INTEGRATOR';
-%system = 'SCALAR';
+% scalar integrator
+%system = 'SCALAR';N_VEH = 1;
+
+% mass with force input, position feedback
+%system = 'SISO_DOUBLE_INTEGRATOR';N_VEH = 1;
+
+% mass with force and velocity input, position and velocity feedback
+% separate comms channels for each input and output
+%system = 'MIMO_DOUBLE_INTEGRATOR';N_VEH = 2;
+
+% 1D "formation flying" - relative measurements
+system = 'MIMO_RELATIVE_MEASUREMENTS';N_VEH = 3;
+
 
 %%%%%%%%%%%
 % SCHEDULE
@@ -96,7 +106,6 @@ if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
     
 else
     
-    N_VEH = 2;
     
     %ALPHAC_BAR = [.75;.75];
     %ALPHAM_BAR = [.75;.75];
