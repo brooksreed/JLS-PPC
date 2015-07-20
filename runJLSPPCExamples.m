@@ -23,10 +23,10 @@ print_debug = 1;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % SIM LENGTH
-SIM_LENGTH = 100; % sim length
+SIM_LENGTH = 40; % sim length
 
 % MPC HORIZON:
-N_HORIZON_MULT = 4; % the MPC horizon Np = Ts*NpMult
+N_HORIZON_MULT = 3; % the MPC horizon Np = Ts*NpMult
 
 %%%%%%%%%%%
 % SYSTEM (set up in setupSystemJPLPPC)
@@ -42,7 +42,7 @@ N_HORIZON_MULT = 4; % the MPC horizon Np = Ts*NpMult
 %system = 'MIMO_DOUBLE_INTEGRATOR';N_VEH = 2;
 
 % 1D "formation flying" - relative measurements
-system = 'MIMO_RELATIVE_MEASUREMENTS';N_VEH = 4;
+system = 'MIMO_RELATIVE_MEASUREMENTS';N_VEH = 10;
 
 
 %%%%%%%%%%%
@@ -69,8 +69,8 @@ elseif( ~isempty(strfind(system,'MIMO')))
     
     % 'MIMO' options: MX, IL
     
-    %sched = 'MX_piggyback';
-    sched = 'MX_noACK';
+    sched = 'MX_piggyback';
+    %sched = 'MX_noACK';
     
     %sched = 'IL_piggyback';
     %sched = 'IL_noACK';
@@ -111,9 +111,9 @@ else
     %ALPHAM_BAR = [.75;.75];
     %ALPHAA_BAR = [.75;.75];
     
-    ALPHAC_BAR = .9*ones(N_VEH,1);
-    ALPHAM_BAR = .9*ones(N_VEH,1);
-    ALPHAA_BAR = .9*ones(N_VEH,1);
+    ALPHAC_BAR = .8*ones(N_VEH,1);
+    ALPHAM_BAR = .8*ones(N_VEH,1);
+    ALPHAA_BAR = .8*ones(N_VEH,1);
     
 end
 

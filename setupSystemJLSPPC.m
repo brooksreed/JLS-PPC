@@ -108,8 +108,8 @@ switch system
         R = eye(N_VEH);
                
         % process/measurement noise
-        W_gen = .01*eye(N_VEH); % cov for process noise input with Bw
-        V = .05*eye(N_VEH);
+        W_gen = .1*eye(N_VEH); % cov for process noise input with Bw
+        V = 1*eye(N_VEH);
         
         % cov... uncertain position but better-known velocity (closer to zero)
         P_11 = [25,0;0,9];  

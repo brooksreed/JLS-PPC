@@ -80,12 +80,17 @@ blockQ((N_HORIZON*N_STATES-N_STATES+1):N_HORIZON*N_STATES,...
     (N_HORIZON*N_STATES-N_STATES+1):N_HORIZON*N_STATES) = Qf;
 blockR = kron(eye(N_HORIZON),R);
 
+% check M is sparse
+if(max(p_i))
+    if(~issparse(M))
+        M=sparse(M);
+    end
+end
+
 cvx_clear
 cvx_begin 
 
-% cvx_solver gurobi 
-% cvx_solver mosek
-cvx_quiet(true)
+%cvx_quiet(true)
 
 if(state_constraints)
     variable X(N_STATES,N_HORIZON+1) 
@@ -118,11 +123,13 @@ if(use_deadband)
 elseif(controlConstraints)
     U <= umax; U >= umin;
 end
+
 % add extra constraints equal to priors
 for i = 1:N_v
     if(p_i(i)>=1)
         Ei = E((N_u*i-(N_u-1)):(N_u*i),:);
         for k = 1:p_i(i)
+            % important to use sparse M here
             U_prior = Ei*M^(k)*b_hat_MPC;
             % saturate (in case of rounding error - stay feasible)
             if(U_prior>=umax(i,k))

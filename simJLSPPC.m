@@ -15,16 +15,16 @@ function [results] = simJLSPPC(SIM_LEN,N_HORIZON,A_SYS,Bu_SYS,Bw_SYS,...
 
 % BR, 4/23/2014
 
-% TO DO:
-% Make sure prep for KF is ready for MIMO and multiple P*s
-% Add logging of P*, P**, etc.?
-% Add more tests/checks?
-
 % more verbose debug printouts from KF
 print_debug_KF = 0;
 
 % log Pstar
 logPstar = 1;
+
+% specify a non-default cvx_solver
+cvx_solver gurobi 
+% cvx_solver mosek
+% cvx_solver sedumi
 
 % INITIALIZATION
 NX_SYS = size(A_SYS,1);
@@ -497,6 +497,7 @@ results.Jcomp = Jcomp;
 results.X_plan = X_plan;
 results.MPC_time = MPC_time;
 results.MPC_fail = MPC_fail;
+results.cvx_solver = cvx_solver;
 
 results.loop_time = loop_time;
 results.Jsim = Jsim/SIM_LEN;
