@@ -130,7 +130,7 @@ Jcomp = NaN*zeros(1,SIM_LEN);
 X_plan = NaN*zeros(NX_SYS,N_HORIZON,SIM_LEN);
 MPC_time = NaN*zeros(SIM_LEN,1);
 loop_time = zeros(SIM_LEN,1);
-MPC_fail = zeros(SIM_LEN,1);
+MPC_fail = NaN*zeros(SIM_LEN,1);
 
 % initial state x_1 and z_1
 X(1:NX_SYS,1) = X_IC;
