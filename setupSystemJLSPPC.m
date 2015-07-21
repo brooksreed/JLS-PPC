@@ -186,5 +186,5 @@ end
 
 % schedule time series
 [PI_C,PI_M,PI_A,TAU_AC,T_S] = createSchedule(sched,N_VEH,SIM_LENGTH,TAU_C);
-N_HORIZON = N_HORIZON_MULT*T_S;
+
 

@@ -20,7 +20,7 @@ function [XHat_out,P_out,Pstar_out] = JLSKF(XHat_in,P_in,y_KF,U_sent,...
 %       u_options(:,1) is most recent, (:,t_NoACK_KF) is furthest back
 %   t_NoACK: time since ACK received (for cov_prior_adj)
 %   Pstar_coefficients: vector of coefficients for Pstar(1:n_stars-1)
-%   Pstar_final_coefficients: vector of last term coefficients: Pstar(n_stars)
+%   Pstar_final_coefficients: vector of last term coeffs: Pstar(n_stars)
 % pd struct: if(pd==0 or [], print_debug_KF = 0)
 %   t: true time at estimator when fcn is called (mostly for debugging)
 %   t_KF: physical time step KF is updating -- x_hat(t_KF|t_KF) posterior
