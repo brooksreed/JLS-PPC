@@ -13,18 +13,30 @@ function [results] = simJLSPPC(SIM_LEN,N_HORIZON,A_SYS,Bu_SYS,Bw_SYS,...
 % print_debug = {1,0} 'global' toggle for debug printouts
 % results: large struct of results
 
-% BR, 4/23/2014
-
-% TO DO:
-% Make sure prep for KF is ready for MIMO and multiple P*s
-% Add logging of P*, P**, etc.?
-% Add more tests/checks?
+% Brooks Reed
+% brooksr8@gmail.com
+% 4/23/2014, updated 7/20/2015
 
 % more verbose debug printouts from KF
 print_debug_KF = 0;
 
+% verbose printouts from CVX (and solver)
+print_debug_cvx = 0;
+
 % log Pstar
 logPstar = 1;
+
+% specify a non-default cvx_solver
+solver = 'Mosek';    % (recommended)
+%solver = 'Gurobi';
+%solver = 'Sedumi';
+disp(solver)
+
+% maxcounter is # of MPC solver retries with adjusted horizons
+    % Note -- extremely time-sensitive applications will want a cap on 
+    % solver time (not yet implemented)
+    % and will considering whether retries should be used
+maxcounter = 2;
 
 % INITIALIZATION
 NX_SYS = size(A_SYS,1);
@@ -35,23 +47,20 @@ N_W = size(Bw_SYS,2);
 N_Y_ALL = size(C_SYS,1);
 N_Y_VEH = N_Y_ALL/N_VEH;
 
-% initialize tNoACK to zeros (no ACK for 'step 0')
+% initialize tNoACK 
 t_NoACK = zeros(N_VEH,SIM_LEN);
-
-% If initial controls unknown
-t_NoACK(:,1:SIM_LEN) = repmat(1:SIM_LEN,[N_VEH,1]);
-
-% after first planned control RX, unknown
-% initialize based on 2nd pi_c + tau_c ?? (need tau_ac too?)
-% tmp = find(pi_c);
-% start = tmp(2)+tc
-% tNoACK(:,start:Ns) = 1:(Ns-start);
+% first period of controls are known
+[~,tmp] = find(PI_C(:,1:T_S));
+tmp = tmp+TAU_AC+(TAU_C+TAU_A);
+for i = 1:N_VEH
+    t_NoACK(i,tmp(i):end) = 1:(SIM_LEN-tmp(i)+1);
+end
 
 % tNoACK *AS KNOWN EACH STEP*
 t_NoACK_save = cell(1,SIM_LEN);
 
 Pstar_save = cell(1,SIM_LEN);
-Pstar_overwrite = zeros(1,SIM_LEN);
+if(N_VEH==1);Pstar_overwrite = zeros(1,SIM_LEN);end
 
 if(cov_prior_adj)
     disp('COV PRIOR ADJUST ON')
@@ -94,39 +103,50 @@ etmp = [1,zeros(1,N_HORIZON-1)];
 E = kron(eye(N_VEH),kron(etmp,eye(N_CONTROLS_VEH)));
 BW = [Bw_SYS;zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,N_W)];
 
-X = zeros(NX_SYS+N_CONTROLS_VEH*N_HORIZON*N_VEH,SIM_LEN);     % includes x and b
-y = zeros(N_Y_ALL,SIM_LEN);                             % true y 
-yh = zeros(N_Y_ALL,SIM_LEN);                            % y into estimator 
-Xh = NaN*zeros(NX_SYS+N_CONTROLS_VEH*N_HORIZON*N_VEH,SIM_LEN);   % includes xHat and bHat
+% includes x and b
+X = zeros(NX_SYS+N_CONTROLS_VEH*N_HORIZON*N_VEH,SIM_LEN);    
+% true y
+y = zeros(N_Y_ALL,SIM_LEN);
+% y into estimator                               
+yh = zeros(N_Y_ALL,SIM_LEN);                            
+% includes xHat and bHat
+Xh = NaN*zeros(NX_SYS+N_CONTROLS_VEH*N_HORIZON*N_VEH,SIM_LEN);   
+
 P = zeros(NX_SYS,NX_SYS,SIM_LEN);
 u = zeros(N_CONTROLS_ALL,SIM_LEN);
 U = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,SIM_LEN);
 
 % initialize jump variable matrices
-Dc = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,N_CONTROLS_VEH*N_HORIZON*N_VEH,SIM_LEN);    
+Dc = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,...
+    N_CONTROLS_VEH*N_HORIZON*N_VEH,SIM_LEN);    
 Dm = zeros(N_VEH*N_Y_VEH,N_VEH*N_Y_VEH,SIM_LEN);
 Da = zeros(N_VEH,N_VEH,SIM_LEN);
 
 % estimated alpha_c, Dc, no loss controls/buffers
-Dc_hat = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,N_CONTROLS_VEH*N_HORIZON*N_VEH,SIM_LEN+TAU_C);   
-Dc_no_loss = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,N_CONTROLS_VEH*N_HORIZON*N_VEH,SIM_LEN+TAU_C);   
+Dc_hat = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,...
+    N_CONTROLS_VEH*N_HORIZON*N_VEH,SIM_LEN+TAU_C);   
+Dc_no_loss = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,...
+    N_CONTROLS_VEH*N_HORIZON*N_VEH,SIM_LEN+TAU_C);   
 alphac_hat = repmat(ALPHAC_BAR,[1 SIM_LEN]);
 for t = (TAU_C+1):SIM_LEN
-    Dc_hat(:,:,t) = makeDc(PI_C(:,t-TAU_C),alphac_hat(:,t-TAU_C),N_CONTROLS_VEH,N_HORIZON);
-    Dc_no_loss(:,:,t) = makeDc(PI_C(:,t-TAU_C),PI_C(:,t-TAU_C),N_CONTROLS_VEH,N_HORIZON);
+    Dc_hat(:,:,t) = makeDc(PI_C(:,t-TAU_C),alphac_hat(:,t-TAU_C),...
+        N_CONTROLS_VEH,N_HORIZON);
+    Dc_no_loss(:,:,t) = makeDc(PI_C(:,t-TAU_C),PI_C(:,t-TAU_C),...
+        N_CONTROLS_VEH,N_HORIZON);
 end
 u_no_loss = zeros(N_CONTROLS_ALL,SIM_LEN);
 b_no_loss = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,SIM_LEN);
 
 % includes xHatMPC and bHatMPC
-XhMPC = NaN*zeros(N_VEH*N_HORIZON*N_CONTROLS_VEH+NX_SYS,TAU_M+TAU_C+1,SIM_LEN);	
+XhMPC = NaN*zeros(N_VEH*N_HORIZON*N_CONTROLS_VEH+NX_SYS,...
+    TAU_M+TAU_C+1,SIM_LEN);	
 
 % variables for saving MPC output/timing
 Jcomp = NaN*zeros(1,SIM_LEN);
 X_plan = NaN*zeros(NX_SYS,N_HORIZON,SIM_LEN);
 MPC_time = NaN*zeros(SIM_LEN,1);
 loop_time = zeros(SIM_LEN,1);
-MPC_fail = zeros(SIM_LEN,1);
+MPC_fail = NaN*zeros(SIM_LEN,1);
 
 % initial state x_1 and z_1
 X(1:NX_SYS,1) = X_IC;
@@ -136,7 +156,7 @@ y(:,1) = C_SYS*X_IC+v_t(:,1);
 X(NX_SYS+1:end,1) = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,1);
 
 % first step propagation - gives x_2
-X(1:NX_SYS,2) =  A_SYS*X_IC + w_t(:,1);
+X(1:NX_SYS,2) =  A_SYS*X_IC + Bw_SYS*w_t(:,1);
 y(:,2) = C_SYS*X(1:NX_SYS,1) + v_t(:,2);
 u(:,1) = E*X(NX_SYS+1:end,1);
 
@@ -153,10 +173,11 @@ for t = (TAU_M+1):(SIM_LEN-1)
         fprintf('\n~~~STEP t=%d AT ESTIMATOR~~~\n',t)
         for i = 1:N_VEH
             if(PI_M(i,t-TAU_M)*alpha_m(i,t-TAU_M)==1)
-                fprintf('\nt=%d, t-%d Meas %d RX success\n',t,i,TAU_M)
+                fprintf('\nt=%d, Meas %d (sent at %d) RX success\n',...
+                    t,i,t-TAU_M)
             end
         end
-    end
+    end  
     
     % determine ACKs available at this step
     % update Dh (and alphaHat), KFstart
@@ -165,7 +186,8 @@ for t = (TAU_M+1):(SIM_LEN-1)
     % also increments a lookahead of tNoACK(t-ta+1 --> future)
     [Dc_hat,alphac_hat,Da,KF_start,t_NoACK,~] = JLSJumpEstimator(Dc_hat,...
         PI_C,Da,alpha_c,alphac_hat,PI_A,T_S,alpha_a,t,TAU_M,TAU_C,...
-        TAU_A,TAU_AC,N_CONTROLS_VEH,N_HORIZON,t_NoACK,N_ACKHISTORY,print_debug);
+        TAU_A,TAU_AC,N_CONTROLS_VEH,N_HORIZON,t_NoACK,N_ACKHISTORY,...
+        print_debug);
     t_NoACK_save{t} = t_NoACK;
     
     if(print_debug)
@@ -173,7 +195,7 @@ for t = (TAU_M+1):(SIM_LEN-1)
         disp_end = t+T_S+2;
         if(disp_start<1);disp_start=1;end
         if(disp_end>SIM_LEN);disp_end=SIM_LEN;end
-        fprintf('\n tNoACK(%d:%d):',disp_start,disp_end)
+        fprintf('\n tNoACK(%d:%d):\n',disp_start,disp_end)
         disp(t_NoACK(:,disp_start:disp_end))
     end
     
@@ -188,9 +210,9 @@ for t = (TAU_M+1):(SIM_LEN-1)
         else
             b_prev = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,1);
         end
-        b_no_loss(:,t-TAU_M-1) = M*(eye(N_HORIZON*N_CONTROLS_VEH*N_VEH)-Dc_no_loss...
-            (:,:,t-TAU_M-1))*b_prev + Dc_no_loss(:,:,t-TAU_M-1)*...
-            U(:,t-TAU_M-1);
+        b_no_loss(:,t-TAU_M-1) = M*(eye(N_HORIZON*N_CONTROLS_VEH*N_VEH)...
+            -Dc_no_loss(:,:,t-TAU_M-1))*b_prev + Dc_no_loss(:,:,...
+            t-TAU_M-1)*U(:,t-TAU_M-1);
         u_no_loss(:,t-TAU_M-1) = E*b_no_loss(:,t-TAU_M-1);
     end
     
@@ -201,26 +223,16 @@ for t = (TAU_M+1):(SIM_LEN-1)
                         
             % determine tNoACK vector for specific filter step
             if(N_VEH==1)
+                
                 if( (t_KF+TAU_AC-1)>0 )
                     t_NoACK_KF = t_NoACK(1,t_KF+TAU_AC-1);
                 else
                     t_NoACK_KF = 1;
                 end
+                
             else
                 
-                % KEEP THIS?  OR MODIFY FOR JUST >0 OR NOT
-                %{
-                t_NoACK_KF = zeros(1,N_VEH);
-                for i = 1:Nv
-                    if(t_KF-1-TAU_AC(i)>0)
-                        t_NoACK_KF(i) = t_NoACK(i,t_KF+TAU_AC(i)-1);
-                    end
-                end
-                %} 
-
-                % (artificially constrain dU to zero for ACK'd channels?)
-                % (DO THIS HERE? OR INSIDE KF?)
-                
+                % one-step approx
                 t_NoACK_KF = 1;
                 
             end
@@ -238,6 +250,18 @@ for t = (TAU_M+1):(SIM_LEN-1)
                 u_options(:,k) = E*M^k*bTMP;
             end
             
+            % overwrite u_options to zero if channel is ACK'd
+            if(N_VEH>1)
+                for i = 1:N_VEH
+                    if( (t_KF+TAU_AC(i)-1)>0 && ...
+                            (t_KF+TAU_AC(i)-1)<SIM_LEN && ...
+                            (t_NoACK(i,t_KF+TAU_AC(i)-1)==0) )
+                        u_options(i,1) = 0;
+                    end
+                end
+            end
+            
+            
         else
             
             u_options = [];
@@ -247,7 +271,8 @@ for t = (TAU_M+1):(SIM_LEN-1)
         
         if(t_KF<=1)
             A_KF = eye(size(A_SYS));
-            Dc_KF_hat = makeDc(zeros(N_VEH,1),zeros(N_VEH,1),N_CONTROLS_VEH,N_HORIZON);
+            Dc_KF_hat = makeDc(zeros(N_VEH,1),zeros(N_VEH,1),...
+                N_CONTROLS_VEH,N_HORIZON);
             Xh_in = [X_HAT1;zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,1)];
             P_in = P_1;
             U_in = zeros(N_CONTROLS_VEH*N_HORIZON*N_VEH,1);
@@ -277,50 +302,53 @@ for t = (TAU_M+1):(SIM_LEN-1)
         end
             
         % Xh(:,t-tm): xHat_{t-tm|t-tm},bHat_{t-tm-1}
-        [Xh(:,t_KF),P(:,:,t_KF),Pstar_save_out] = JLSKF(Xh_in,P_in,y_in,U_in,Dc_KF_hat,...
-            NX_SYS,N_VEH,N_CONTROLS_VEH,N_HORIZON,Dm_in,A_KF,Bu_SYS,E,M,C_SYS,...
-            W_KF,V_KF,ALPHAC_BAR,cov,pd_KF);
+        [Xh(:,t_KF),P(:,:,t_KF),Pstar_save_out] = JLSKF(Xh_in,P_in,...
+            y_in,U_in,Dc_KF_hat,NX_SYS,N_VEH,N_CONTROLS_VEH,N_HORIZON,...
+            Dm_in,A_KF,Bu_SYS,E,M,C_SYS,W_KF,V_KF,ALPHAC_BAR,cov,pd_KF);
         
         % log Pstar 
         if(logPstar)
+            
             if(isempty(Pstar_save{t_KF}))
                 
                 % log Pstar array 
                 Pstar_save{t_KF} = Pstar_save_out;
                 
             else
+                
+                % backup-and-rerun is overwriting previously set Pstar
                 if(print_debug_KF)
-                    fprintf('\nt=%d, KF tKF=%d, overwriting Pstar\n',t,t_KF)
+                    fprintf('\nt=%d, KF tKF=%d, overwriting Pstar\n',...
+                        t,t_KF)
                 end
                 
-                % If delays are not excessively long vs. n_ACKHistory,
-                % then overwrite should be with empty Pstar
-                % keep the original Pstars in Pstar_save, 
-                % and indicate that this step of Pstar is overwritted
-                if(isempty(Pstar_save_out))
-                    Pstar_overwrite(t_KF) = 1;
+                if(N_VEH==1)
+                    % If delays are not excessively long vs. n_ACKHistory,
+                    %   then only overwrites should be with empty Pstar
+                    % --> keep the original Pstars in Pstar_save, 
+                    %   and indicate that this step of Pstar is overwritted
+                    if(isempty(Pstar_save_out))
+                        Pstar_overwrite(t_KF) = 1;
+                    else
+                        disp('warning -- OVERWRITE WITH NONEMPTY PSTAR')
+                        disp(Pstar_save_out)
+                    end
                 else
-                    disp('OVERWRITE WITH NONEMPTY PSTAR')
-                    disp(Pstar_save_out)
+                    % makes a cell with each successive Pstar overwrite.  
+                    tmp = Pstar_save{t_KF};
+                    if(iscell(tmp))
+                        tmpsize = length(tmp);
+                        tmpcell = tmp;
+                    else
+                        tmpsize = 1;
+                        tmpcell{1} = tmp;
+                    end
+                    PstarHistory = cell(1,tmpsize+1);
+                    PstarHistory(1:tmpsize) = tmpcell;
+                    PstarHistory{tmpsize+1} = Pstar_save_out;
+                    Pstar_save{t_KF} = PstarHistory;
+                    clear tmpcell
                 end
-                
-                % version which makes a cell with each successive 
-                % Pstar overwrite.  
-                %{
-                tmp = Pstar_save{t_KF};
-                if(iscell(tmp))
-                    tmpsize = length(tmp);
-                    tmpcell = tmp;
-                else
-                    tmpsize = 1;
-                    tmpcell{1} = tmp;
-                end
-                PstarHistory = cell(1,tmpsize+1);
-                PstarHistory(1:tmpsize) = tmpcell;
-                PstarHistory{tmpsize+1} = Pstar_save_out;
-                Pstar_save{t_KF} = PstarHistory;
-                %}
-                
             end
         end
         
@@ -367,10 +395,11 @@ for t = (TAU_M+1):(SIM_LEN-1)
         U_fwd = U(:,(t-TAU_M):(t+TAU_C-1));
         D_fwd = Dc_hat(:,:,(t-TAU_M):(t+TAU_C-1));
         [XhMPC(:,:,t+TAU_C),p_i] = prepMPC(t,Xh(:,t-TAU_M),U_fwd,D_fwd,...
-            PI_C,A_SYS,Bu_SYS,E,M,NX_SYS,N_VEH,N_CONTROLS_VEH,N_HORIZON,TAU_M,TAU_C);
-              
+            PI_C,A_SYS,Bu_SYS,E,M,NX_SYS,N_VEH,N_CONTROLS_VEH,N_HORIZON,...
+            TAU_M,TAU_C);
+        
         solve_status = 0;
-        counter = 1;
+        counter = 1;    
         T_MPC = N_HORIZON;
         while(solve_status==0)
             
@@ -379,10 +408,11 @@ for t = (TAU_M+1):(SIM_LEN-1)
             % (even though control computed at time t)
             
             % compute U_{t+tc}^i, forall i s.t. {Pi_c(i,t) = 1}
-            [U_MPC,Jcomp(t+TAU_C),status,X_plan_out,~] = schedMPC(XhMPC(1:NX_SYS,...
-                end,t+TAU_C),XhMPC((NX_SYS+1):end,end,t+TAU_C),p_i,...
+            [U_MPC,Jcomp(t+TAU_C),status,X_plan_out,~] = schedMPC(...
+                XhMPC(1:NX_SYS,end,t+TAU_C),...
+                XhMPC((NX_SYS+1):end,end,t+TAU_C),p_i,...
                 T_MPC,A_SYS,Bu_SYS,M,E,QMPC,QfMPC,RMPC,u_max,u_min,...
-                xmin,xmax,[]);
+                xmin,xmax,[],solver,print_debug_cvx);
             
             if(strfind(status,'Solved'))
                 solve_status=1;
@@ -390,20 +420,35 @@ for t = (TAU_M+1):(SIM_LEN-1)
                     fprintf('\nt=%d, MPC: %s\n',t,status)
                 end
                 
+            % (add a case for 'Inaccurate/Unbounded'?)
+
             elseif( strcmp(status,'Failed') )
+                counter = counter+1;
                 disp('FAILED')
+                disp(counter)
+                if(strcmp(solver,'Gurobi'))
+                    % Gurobi can fail with longer horizons
+                    % try very short
+                    T_MPC = T_S;
+                elseif(strcmp(solver,'MOSEK'))
+                    % Mosek prefers longer horizons
+                    T_MPC = 5*T_S;
+                end
+                [u_max,u_min,xmax,xmin] = paramsNow(U_MAX_T,U_MIN_T,...
+                    X_MAX,X_MIN,t+1,T_MPC);
+                pause(0.5)  
                 
             elseif( strcmp(status,'Infeasible') )
+                counter = counter+1;
                 disp('INFEASIBLE')
                 disp(counter)
-                disp(XhMPC(:,end,t+TAU_C))
+                % if infeasible, try increasing horizon
                 T_MPC = T_MPC+4;
-                [U_MAX,U_MIN,xmax,xmin] = paramsNow(U_MAX_T,U_MIN_T,...
+                [u_max,u_min,xmax,xmin] = paramsNow(U_MAX_T,U_MIN_T,...
                     X_MAX,X_MIN,t+1,T_MPC);
             end
             
-            counter = counter+1;
-            if(counter>2)
+            if(counter>maxcounter)
                 disp('MAXCOUNTER')
                 U_MPC = zeros(N_CONTROLS_ALL,N_HORIZON);
                 MPC_fail(t+TAU_C) = 1;
@@ -411,9 +456,17 @@ for t = (TAU_M+1):(SIM_LEN-1)
             end
             
         end
-        U_MPC = U_MPC(:,1:N_HORIZON);    % truncate if TMPC>Np
-        X_plan(:,:,t+TAU_C) = X_plan_out(:,1:N_HORIZON);
         
+        % logging must handle adjusted horizons
+        % truncate if TMPC>Np, handle shorter horizon too
+        logmax = T_MPC;
+        if(logmax>N_HORIZON);logmax=N_HORIZON;end
+        X_plan(:,1:logmax,t+TAU_C) = X_plan_out(:,1:logmax);
+        
+        tmp = zeros(N_VEH,N_HORIZON);
+        tmp(:,1:logmax)= U_MPC(:,1:logmax);
+        U_MPC = tmp;   
+
         MPC_time(t) = toc(MPCtic);
         
     else % (for saving - make clear not set)
@@ -433,13 +486,15 @@ for t = (TAU_M+1):(SIM_LEN-1)
     % true system propagation
     % reshape into MJLS form (for step t), uses D_t(pi(t-tc),alpha_c(t-tc))
     if(t<=TAU_C)
-        Dc(:,:,t) = makeDc(zeros(1,N_VEH),zeros(1,N_VEH),N_CONTROLS_VEH,N_HORIZON);
+        Dc(:,:,t) = makeDc(zeros(1,N_VEH),zeros(1,N_VEH),...
+            N_CONTROLS_VEH,N_HORIZON);
     else
         Dc(:,:,t) = makeDc(PI_C(:,t-TAU_C),alpha_c(:,t-TAU_C),...
             N_CONTROLS_VEH,N_HORIZON);
     end
     I = eye(size(Dc(:,:,1)));
-    AA = [A_SYS,Bu_SYS*E*M*(I-Dc(:,:,t));zeros(N_VEH*N_HORIZON*N_CONTROLS_VEH,...
+    AA = [A_SYS,Bu_SYS*E*M*(I-Dc(:,:,t));...
+        zeros(N_VEH*N_HORIZON*N_CONTROLS_VEH,...
         NX_SYS),M*(I-Dc(:,:,t))];
     BU = [Bu_SYS*E*Dc(:,:,t);Dc(:,:,t)];
     
@@ -482,13 +537,14 @@ results.P = P;
 
 results.t_NoACK_save = t_NoACK_save;
 results.Pstar_save = Pstar_save;
-results.Pstar_overwrite = Pstar_overwrite;
+if(N_VEH==1);results.Pstar_overwrite = Pstar_overwrite;end
 
 results.XhMPC = XhMPC;
 results.Jcomp = Jcomp;
 results.X_plan = X_plan;
 results.MPC_time = MPC_time;
 results.MPC_fail = MPC_fail;
+results.cvx_solver = cvx_solver;
 
 results.loop_time = loop_time;
 results.Jsim = Jsim/SIM_LEN;

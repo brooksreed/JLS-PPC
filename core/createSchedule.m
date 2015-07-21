@@ -11,6 +11,7 @@ function [PI_C,PI_M,PI_A,TAU_AC,T_S] = createSchedule(sched,N_VEH,...
 % 'MX_noACK', 'IL_noACK' 
 % 'MX_piggyback', 'IL_piggyback' -- ACK sched matches measurements
 % 'MX_ACK1', 'IL_ACK1' -- ACK 1 slot after control (assumes tc=1)
+% 'MX_dedicated','IL_dedicated' -- (NOT IMPLEMENTED YET)
 %
 % 'SISO_' options for _piggyback or _noACK:
 % 'SISOALL' - [1],[1] (std. discrete-time)

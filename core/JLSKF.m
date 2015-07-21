@@ -20,7 +20,7 @@ function [XHat_out,P_out,Pstar_out] = JLSKF(XHat_in,P_in,y_KF,U_sent,...
 %       u_options(:,1) is most recent, (:,t_NoACK_KF) is furthest back
 %   t_NoACK: time since ACK received (for cov_prior_adj)
 %   Pstar_coefficients: vector of coefficients for Pstar(1:n_stars-1)
-%   Pstar_final_coefficients: vector of last term coefficients: Pstar(n_stars)
+%   Pstar_final_coefficients: vector of last term coeffs: Pstar(n_stars)
 % pd struct: if(pd==0 or [], print_debug_KF = 0)
 %   t: true time at estimator when fcn is called (mostly for debugging)
 %   t_KF: physical time step KF is updating -- x_hat(t_KF|t_KF) posterior
@@ -54,17 +54,18 @@ elseif(isempty(pd) || pd==0)
     
 end
 
-% covariance prior (standard)
-P_pre_0 = A*P_in*A' + W ; %P_{t+1|t}
+% P_{t+1|t} covariance prior (standard)
+% note - if needed, this W should be scaled by Bw (as in setupSystemJLSPPC) 
+P_pre_0 = A*P_in*A' + W ; 
 
 if( cov_prior_adj && (max(t_NoACK)>0) )
     
     % SENT control command for step t
     u_t = E*U_sent;
     
-    dU = zeros(size(u_t,1),max(t_NoACK));
+    q = zeros(size(u_t,1),max(t_NoACK));
     for i = 1:max(t_NoACK)
-        dU(:,i) = (u_t - u_options(:,i));
+        q(:,i) = (u_t - u_options(:,i));
     end
     
     % Single input systems
@@ -92,12 +93,12 @@ if( cov_prior_adj && (max(t_NoACK)>0) )
             % coefficients for all except last term:
             for j = 1:(t_NoACK-1)
                 Pstar(:,:,j) = Pstar_coefficients(j)*...
-                    Bu*dU(:,j)*dU(:,j)'*Bu';
+                    Bu*q(:,j)*q(:,j)'*Bu';
             end
         end
         % separate coefficient form for the last term:
         Pstar(:,:,t_NoACK) = Pstar_final_coefficients(t_NoACK)*...
-            Bu*dU(:,t_NoACK)*dU(:,t_NoACK)'*Bu';
+            Bu*q(:,t_NoACK)*q(:,t_NoACK)'*Bu';
         
         if(print_debug_kf)
             
@@ -134,18 +135,18 @@ if( cov_prior_adj && (max(t_NoACK)>0) )
         % (zero out dU manually for ACK'd channels - need to test)
         for i = 1:length(t_NoACK)
             if(t_NoACK(i) == 0)
-                dU(i,1) = 0;
+                q(i,1) = 0;
             end
         end
         
         % off diagonal elements
-        E_AZA = diag(ALPHAC_BAR)*dU(:,1)*dU(:,1)'*diag(ALPHAC_BAR);
+        E_AZA = diag(ALPHAC_BAR)*q(:,1)*q(:,1)'*diag(ALPHAC_BAR);
         
         % replace diagonal elements
-        dum = diag(ALPHAC_BAR)*dU(:,1)*dU(:,1)';
+        dum = diag(ALPHAC_BAR)*q(:,1)*q(:,1)';
         for i = 1:N_CONTROLS; E_AZA(i,i) = dum(i,i) ; end;
         
-        Pstar = Bu*(E_AZA - diag(ALPHAC_BAR)*dU(:,1)*dU(:,1)'*...
+        Pstar = Bu*(E_AZA - diag(ALPHAC_BAR)*q(:,1)*q(:,1)'*...
             diag(ALPHAC_BAR))*Bu';
         
         P_pre = P_pre_0 + Pstar;
@@ -173,9 +174,9 @@ P_out = P_pre - L*(C*P_pre);
 % propagate system
 I = eye(size(A));
 AAHat = [(I-L*C)*A,...
-    (I-L*C)*Bu*E*M*(eye(N_HORIZON*N_CONTROLS*N_AGENTS)-Dc_hat_all);...
+    (I-L*C)*Bu*E*M*sparse(eye(N_HORIZON*N_CONTROLS*N_AGENTS)-Dc_hat_all);...
     zeros(N_AGENTS*N_HORIZON*N_CONTROLS,N_STATES),...
-    M*(eye(N_HORIZON*N_CONTROLS*N_AGENTS)-Dc_hat_all)];
+    M*sparse(eye(N_HORIZON*N_CONTROLS*N_AGENTS)-Dc_hat_all)];
 BUHat = [(I-L*C)*Bu*E*Dc_hat_all;Dc_hat_all];
 XHat_out = AAHat*XHat_in + BUHat*U_sent + ...
     [L;zeros(N_HORIZON*N_CONTROLS*N_AGENTS,size(y_KF,1))]*y_KF;

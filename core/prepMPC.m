@@ -34,7 +34,12 @@ end
 p_i = zeros(N_VEH,1);
 for i = 1:N_VEH
     i_inds = find(PI_C(i,(t_sim):end)==1);
-    p_i(i) = i_inds(1)-1;
+    if(~isempty(i_inds))
+        p_i(i) = i_inds(1)-1;
+    else
+        % (end of run condition)
+        p_i(i) = 0;
+    end
 end
 
 end

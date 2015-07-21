@@ -6,34 +6,45 @@
 % a few options for schedules
 % handles varying lengths of ACK histories
 
-% some simple plots for SISO systems at end
+% some simple plots for at end
 
-% BR, 5/27/2015
+% Brooks Reed
+% brooksr8@gmail.com
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 clear variables
-close all
-clc
+%close all
+%clc
 
-print_debug = 0;
+print_debug = 1;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SYSTEM DEFINITION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % SIM LENGTH
-SIM_LENGTH = 30; % sim length
+SIM_LENGTH = 300; % sim length
 
 % MPC HORIZON:
-N_HORIZON_MULT = 4; % the MPC horizon Np = Ts*NpMult
+N_HORIZON = 40; % (consider N_VEH, and T_S when setting this)
 
 %%%%%%%%%%%
 % SYSTEM (set up in setupSystemJPLPPC)
 
-system = 'SISO_DOUBLE_INTEGRATOR';
-%system = 'MIMO_DOUBLE_INTEGRATOR';
-%system = 'SCALAR';
+% scalar integrator
+%system = 'SCALAR';N_VEH = 1;
+
+% mass with force input, position feedback
+%system = 'SISO_DOUBLE_INTEGRATOR';N_VEH = 1;
+
+% mass with force and velocity input, position and velocity feedback
+% separate comms channels for each input and output
+%system = 'MIMO_DOUBLE_INTEGRATOR';N_VEH = 2;
+
+% 1D "formation flying" - relative measurements
+system = 'MIMO_RELATIVE_MEASUREMENTS';N_VEH = 10;
+
 
 %%%%%%%%%%%
 % SCHEDULE
@@ -50,19 +61,19 @@ if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
     %sched = 'SISO4_noACK';
     
     %sched = 'SISO2_noACK';
-    %sched = 'SISO2_piggyback';
+    sched = 'SISO2_piggyback';
     
-    sched = 'SISOALL_piggyback';
+    %sched = 'SISOALL_piggyback';
     %sched = 'SISOALL_noACK';
     
 elseif( ~isempty(strfind(system,'MIMO')))
     
     % 'MIMO' options: MX, IL
     
-    sched = 'MX_piggyback';
+    %sched = 'MX_piggyback';
     %sched = 'MX_noACK';
     
-    %sched = 'IL_piggyback';
+    sched = 'IL_piggyback';
     %sched = 'IL_noACK';
     
 end
@@ -74,11 +85,10 @@ TAU_A = 1; % ACK delay
 
 % ACK SETTINGS
 % Length of ACK history sent
-% Should be 1 + a multiple of schedule length
-% eg...  to ACK the newest control command, make N_ACKHISTORY = 1
-%        to ACK newest and previous commands, make N_ACKHISTORY = 1 + T_S
-%        to ACK the newest and 2 prev. cmds, make N_ACKHISTORY = 1 + 2*T_S
-N_ACKHISTORY = 3;
+% Should be 1 + a multiple of schedule length = 1+T_S*N_ACKHISTORY_PERIODS
+%N_ACKHISTORY_PERIODS = 0;
+%N_ACHISTORY_PERIODS = 1;
+N_ACKHISTORY_PERIODS = 5;
 
 % adjustment to covariance priors due to no ACKs/control losses:
 cov_prior_adj = 1;
@@ -89,22 +99,15 @@ cov_prior_adj = 1;
 % Nv is number of control AND meas channels (asymmetric # not implemented)
 if( ~isempty(strfind(system,'SISO')) || ~isempty(strfind(system,'SCALAR')))
     
-    N_VEH = 1;
-    ALPHAC_BAR = .75; % controls
-    ALPHAM_BAR = .75;  % measurements
-    ALPHAA_BAR = .75; % ACKs (if piggyback used, betaBar overrides gammaBar)
+    ALPHAC_BAR = .6; % controls
+    ALPHAM_BAR = .6;  % measurements
+    ALPHAA_BAR = .6; % ACKs (if piggyback used, betaBar overrides gammaBar)
     
 else
     
-    N_VEH = 2;
-    
-    %ALPHAC_BAR = [.75;.75];
-    %ALPHAM_BAR = [.75;.75];
-    %ALPHAA_BAR = [.75;.75];
-    
-    ALPHAC_BAR = .75*ones(N_VEH,1);
-    ALPHAM_BAR = .75*ones(N_VEH,1);
-    ALPHAA_BAR = .75*ones(N_VEH,1);
+    ALPHAC_BAR = .9*ones(N_VEH,1);
+    ALPHAM_BAR = .9*ones(N_VEH,1);
+    ALPHAA_BAR = .9*ones(N_VEH,1);
     
 end
 
@@ -113,17 +116,20 @@ end
 % (system params are in setupSystemJLSPPC script)
 setupSystemJLSPPC
 
+% 'raw' ACK history length as fcn of periods to be ACK'd
+N_ACKHISTORY = 1+T_S*N_ACKHISTORY_PERIODS;
+
 % initial conditions
 x_IC = 5*randn(size(A,1),1);
-if(size(A,1)==2)
+if(size(A,1)>1)
     % position only, no initial velocity (so like step resp from rest)
-    x_IC(2)=0;x_IC(1)=5;
+    x_IC(2:2:end) = 0;
 end
 
 % (IF WANT TO DEBUG CONTROLLER - INIT ESTIMATOR PERFECTLY)
 % xHat1 = xIC;P1 = 1*eye(2);
 
-% (DEBUG SEQUENCES FOR ACKS)
+% (SOME HARDCODED DEBUG SEQUENCES FOR MEAS/ACKS)
 %{
 % tests w/ 1 then 2 then 3 missed ACKs
 if(T_S==1)
@@ -142,10 +148,12 @@ end
 
 %% call sim fcn
 
+tic
 [r] = simJLSPPC(SIM_LENGTH,N_HORIZON,A,Bu,Bw,C,Q,Qf,R,W,V,TAU_M,TAU_C,...
     TAU_A,TAU_AC,ALPHAC_BAR,PI_C,PI_M,PI_A,T_S,U_MAX,U_MIN,CODEBOOK,...
     X_MAX,X_MIN,x_IC,P_1,x_hat_1,w,v,alpha_c,alpha_m,alpha_a,...
     cov_prior_adj,N_ACKHISTORY,print_debug);
+fprintf('\n TOTAL SIMULATION TIME: %f\n',toc)
 r.sys.sched = sched;
 r.sys.system =system;
 r.sys.ALPHAM_BAR = ALPHAM_BAR;
@@ -177,8 +185,13 @@ else
     
     NX_SYS = size(r.P,1);    % underlying system states (no buffer)
     SIM_LENGTH = size(r.X,2);
-    
+        
     CPlot = r.sys.C;
+    if(strcmp(system,'MIMO_RELATIVE_MEASUREMENTS'))
+        CPlot = CPlot>0;
+        % (plots positions of each mass, as opposed to the measured output
+        % which is their relative positions)
+    end
     figure
     subplot(3,1,[1 2])
     hx = plot(0:SIM_LENGTH-1,CPlot*r.X(1:NX_SYS,:));
@@ -188,7 +201,7 @@ else
     title('MIMO System (colors are i/o channels)')
     
     subplot(3,1,3)
-    hu = stairs(repmat(0:SIM_LENGTH-1,[2,1])',r.u');
+    hu = stairs(repmat(0:SIM_LENGTH-1,[N_VEH,1])',r.u');
     xlabel('time step')
     ylabel('u')
     

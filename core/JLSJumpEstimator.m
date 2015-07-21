@@ -52,7 +52,8 @@ check_start = (t_sim-TAU_A-max(TAU_AC)>TAU_C);
 if( ~isempty(a_inds) && check_start )
     
     % for each ACK channel
-    max_t_ACK = zeros(size(a_inds));min_t_ACK = NaN*zeros(size(a_inds));
+    %max_t_ACK = zeros(size(a_inds));min_t_ACK = NaN*zeros(size(a_inds));
+    max_t_ACK = zeros(1,n_ACKs);min_t_ACK = NaN*zeros(1,n_ACKs);
     t_ACK = cell(1,length(a_inds));
     for i = a_inds
         
@@ -108,7 +109,7 @@ got_ACK = zeros(size(Da_mod,3));
 for i = 1:length(a_inds)
     got_ACK(a_inds(i)) = 1;
     if(print_debug_JE)
-        fprintf('\nt=%d, JE GOT ACK, channel %d \n',t_sim,i)
+        fprintf('\nt=%d, JE GOT ACK, channel %d \n',t_sim,a_inds(i))
     end
 end
 

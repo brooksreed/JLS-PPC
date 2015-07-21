@@ -1,6 +1,6 @@
 function [U,cost,status,X_Out,violate_slack] = schedMPC(x_In,...
             b_hat_MPC,p_i,N_HORIZON,A,Bu,M,E,Q,Qf,R,...
-            umax,umin,xmin,xmax,u_deadband)
+            umax,umin,xmin,xmax,u_deadband,solver,print_debug_cvx)
 % solve deterministic scheduled MPC with cvx 
 % [U,cost,status,X_Out,violate_slack] = schedMPC(x_In,...
 %             b_hat_MPC,p_i,N_HORIZON,A,Bu,M,E,Q,Qf,R,...
@@ -17,7 +17,8 @@ function [U,cost,status,X_Out,violate_slack] = schedMPC(x_In,...
 % state constraints implemented with slack variable "barrier"
 % uDB is deadband width (NOTE - this makes MPC very slow, requires MIQP
 %   solver such as Gurobi)
-%
+% solver: 'Mosek','Gurobi','Sedumi','SDP3' (unset, or []: system default)
+% 
 % U is computed plan
 % cost, status from CVX
 % X_Out output gives predicted state trajectory
@@ -25,19 +26,28 @@ function [U,cost,status,X_Out,violate_slack] = schedMPC(x_In,...
 %   gives i (state), j (time step) and violation size
 
 % TO DO: 
-% try-catch for cvx solver slow on startup?
-% [try a faster solver such as QPOasis?]
+% [try a faster solver such as QPOasis? w/ warm start]
 
-if(nargin<15)
+% input handling: 
+if(nargin<18)
+    print_debug_cvx = 0;
+end
+
+if(nargin<17 || isempty(solver) || ~ischar(solver) )
+    % use system default
+    solver = cvx_solver;
+end
+
+if(nargin<16)
     u_deadband = [];
 end
 
-if(nargin<14)
+if(nargin<15)
     xmin = [];
     xmax = [];
 end
 
-if(nargin<12)
+if(nargin<13)
     umin = [];
     umax = [];
 end
@@ -70,6 +80,7 @@ else
     state_constraints = 1;
 end
 
+% system parameters
 N_U = size(Bu,2); 
 N_STATES = size(A,1);
 N_v = length(p_i);
@@ -80,15 +91,30 @@ blockQ((N_HORIZON*N_STATES-N_STATES+1):N_HORIZON*N_STATES,...
     (N_HORIZON*N_STATES-N_STATES+1):N_HORIZON*N_STATES) = Qf;
 blockR = kron(eye(N_HORIZON),R);
 
+% if constraining control priors
+if(max(p_i))
+    
+    % check M is sparse
+    if(~issparse(M))
+        M=sparse(M);
+    end
+    
+    % saturate p_i if needed 
+    % (although not recommended to set N_HORIZON < T_S)
+    satInds = p_i>N_HORIZON;
+    if(max(satInds));disp('WARNING - p_i > N_HORIZON');end
+    p_i(satInds)=N_HORIZON;
+    
+end
+
 cvx_clear
 cvx_begin 
-try
-    % first choice not installed with CVX
-    cvx_solver gurobi
-catch 
-    cvx_solver sedumi
+
+cvx_solver(solver)
+
+if(~print_debug_cvx)
+    cvx_quiet(true)
 end
-cvx_quiet(true)
 
 if(state_constraints)
     variable X(N_STATES,N_HORIZON+1) 
@@ -121,11 +147,13 @@ if(use_deadband)
 elseif(controlConstraints)
     U <= umax; U >= umin;
 end
+
 % add extra constraints equal to priors
 for i = 1:N_v
     if(p_i(i)>=1)
         Ei = E((N_u*i-(N_u-1)):(N_u*i),:);
         for k = 1:p_i(i)
+            % important to use sparse M here
             U_prior = Ei*M^(k)*b_hat_MPC;
             % saturate (in case of rounding error - stay feasible)
             if(U_prior>=umax(i,k))
