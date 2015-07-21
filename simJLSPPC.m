@@ -147,6 +147,7 @@ X_plan = NaN*zeros(NX_SYS,N_HORIZON,SIM_LEN);
 MPC_time = NaN*zeros(SIM_LEN,1);
 loop_time = zeros(SIM_LEN,1);
 MPC_fail = NaN*zeros(SIM_LEN,1);
+MPC_status = cell(1,SIM_LEN);
 
 % initial state x_1 and z_1
 X(1:NX_SYS,1) = X_IC;
@@ -177,7 +178,12 @@ for t = (TAU_M+1):(SIM_LEN-1)
                     t,i,t-TAU_M)
             end
         end
-    end  
+    else
+        % print t every few steps for tracking progress
+        if(~mod(t,10))
+            fprintf('%d\n',t)
+        end
+    end
     
     % determine ACKs available at this step
     % update Dh (and alphaHat), KFstart
@@ -454,7 +460,6 @@ for t = (TAU_M+1):(SIM_LEN-1)
                 MPC_fail(t+TAU_C) = 1;
                 break
             end
-            
         end
         
         % logging must handle adjusted horizons
@@ -468,6 +473,7 @@ for t = (TAU_M+1):(SIM_LEN-1)
         U_MPC = tmp;   
 
         MPC_time(t) = toc(MPCtic);
+        MPC_status{t} = status;
         
     else % (for saving - make clear not set)
         
