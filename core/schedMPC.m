@@ -26,7 +26,9 @@ function [U,cost,status,X_Out,violate_slack] = schedMPC(x_In,...
 %   gives i (state), j (time step) and violation size
 
 % TO DO: 
-% [try a faster solver such as QPOasis? w/ warm start]
+% [try a faster solver such as QPOasis? 
+% OR http://stanford.edu/~boyd/fast_mpc/ 
+% both can use warm start
 
 % input handling: 
 if(nargin<18)
@@ -108,9 +110,14 @@ if(max(p_i))
 end
 
 cvx_clear
+
+% trying this to debug
+cvx_setpath
+
 cvx_begin 
 
 cvx_solver(solver)
+cvx_precision low
 
 if(~print_debug_cvx)
     cvx_quiet(true)
