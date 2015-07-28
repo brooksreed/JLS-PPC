@@ -2,6 +2,8 @@
 Jump Linear System framework for networked control with schedules, delays, packet loss
 
 Author: Brooks Reed, brooksr8@gmail.com
+Release 1.0 7/21/2015
+Release 1.1 7/28/2015 - minor updates to readme, added testMPC script
 
 Link to paper (describes notation, JLS system, algorithms):(coming soon)
 
