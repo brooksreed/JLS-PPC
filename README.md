@@ -1,4 +1,4 @@
-# JLS-MPC
+# JLS-PPC
 Jump Linear System framework for networked control with schedules, delays, packet loss
 
 Author: Brooks Reed, brooksr8@gmail.com
@@ -8,12 +8,16 @@ Link to paper (describes notation, JLS system, algorithms):(coming soon)
 runJLSPPCExamples is the main file for user input -- runs a simulation
 
 User input: 
-- underlying system dynamics
-    - some options for these are provided in setupSystemJLSPPC
-        - scalar, SISO double integrator, MIMO double integrator
-    - A, Bu, Bw, C
-    - process noise W, measurement noise V
-    - x_IC initial condition
+- underlying system
+    - (some options for these are provided in setupSystemJLSPPC)
+        - Scalar integrator system
+        - SISO double integrator (eg mass with position measurements and force inputs)
+        - MIMO double integrator (eg mass with position and velocity measurements, and force and velocity inputs)
+        - Chain of double integrators with relative position measurements
+    - system parameters (set manually or using setupSystemJLSPPC)
+        - A, Bu, Bw, C
+        - process noise W, measurement noise V
+        - x_IC initial condition
 - MPC parameters and settings
     - control constraints U_MAX, U_MIN
     - control quantization (linear, with N_QUANT_LEVELS)
@@ -21,7 +25,7 @@ User input:
     - MPC horizon N_HORIZON
     - MPC weights on states Q, control R, and terminal state Qf
 - schedule for control, measurement, and control ACK packets
-    - some options constructed in createSchedule
+    - (some options constructed in createSchedule)
     - PI_C for controls, PI_M for measurements, PI_A for ACKs
 - packet success probabilities (bernoulli) 
     - ALPHAC_BAR, ALPHAM_BAR, ALPHAA_BAR 
@@ -38,7 +42,7 @@ simJLSPPC runs a simulation using all elements of the framework
 plotJLSPPC_SISO makes some simple plots for SISO systems
 - runs after a sim in the example script, can also be run after loading a saved results struct
 
-/core contains the core JLS functions 
+/core directory contains the core JLS functions 
 - computePstars: utility function for generating covariance prior adjustment (P*) coefficients
 - createSchedule: constructs time series scheduling variables based on a few prototype schedule options
 - evaluatePstars: fast lookup table of analytic P* coefficient formulas
@@ -51,7 +55,10 @@ plotJLSPPC_SISO makes some simple plots for SISO systems
 - paramsNow: grabs a receding-horizon window of constraints for use by the MPC
 - prepMPC: computes state estimate for the time control is scheduled to be applied via a forward propagation to bridge the round-trip communication delay
 - schedMPC: solves the MPC optimization with awareness of control packet scheduling 
-    - The MPC solver requires CVX and is currently set up to use gurobi (but any QP solver hooked into CVX will do).  Could be modified to use a different solver relatively easily.  
+    - The MPC solver requires CVX (http://cvxr.com/cvx/) 
+    - Currently Mosek (available with CVX academic license) is recommended, but any QP solver hooked into CVX should work
+
+testMPC is a debugging tool for running a single solver instance of MPC
 
 Notes: 
 - More detailed comments in code
