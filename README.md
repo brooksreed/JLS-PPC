@@ -3,7 +3,7 @@ Jump Linear System framework for networked control with schedules, delays, packe
 
 Author: Brooks Reed, brooksr8@gmail.com
 
-Link to paper (describes notation, JLS system, algorithms):(coming soon)
+Link to paper (describes notation, JLS system, algorithms): http://ieeexplore.ieee.org/xpl/login.jsp?tp=&arnumber=7524684
 
 runJLSPPCExamples is the main file for user input -- runs a simulation
 
